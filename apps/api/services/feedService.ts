@@ -1,11 +1,21 @@
 import type { FeedItem } from '@zaha/shared';
 import { createAdminClient } from '@/lib/supabase/server';
 
-export async function getFeed(): Promise<FeedItem[]> {
+export interface FeedFilters {
+  location?: string;
+  query?: string;
+  userId?: string;
+}
+
+function sanitizeIlike(value: string): string {
+  return value.replace(/[%_,()"']/g, ' ').trim();
+}
+
+export async function getFeed(filters?: FeedFilters): Promise<FeedItem[]> {
   try {
     const supabase = createAdminClient();
 
-  const { data: posts, error } = await supabase
+  let dbQuery = supabase
     .from('posts')
     .select(`
       id,
@@ -31,12 +41,31 @@ export async function getFeed(): Promise<FeedItem[]> {
     .order('created_at', { ascending: false })
     .limit(50);
 
-  if (error) {
-    console.error('Feed fetch error:', error);
-    return getSeedFeed();
+  // Filtres optionnels : par défaut, TOUT le feed est renvoyé.
+  const location = filters?.location?.trim();
+  if (location) {
+    dbQuery = dbQuery.ilike('location', `%${sanitizeIlike(location)}%`);
   }
 
-  if (!posts?.length) return getSeedFeed();
+  const query = filters?.query?.trim();
+  if (query) {
+    const safe = sanitizeIlike(query);
+    if (safe) {
+      dbQuery = dbQuery.or(`content.ilike.%${safe}%,location.ilike.%${safe}%`);
+    }
+  }
+
+  const { data: posts, error } = await dbQuery;
+
+  if (error) {
+    console.error('Feed fetch error:', error);
+    return [];
+  }
+
+  if (!posts?.length) return [];
+
+  // liked par post uniquement si un userId est fourni (sinon contrat inchangé)
+  const viewerId = filters?.userId?.trim() || undefined;
 
   return posts.map((post) => {
     const author = Array.isArray(post.author) ? post.author[0] : post.author;
@@ -56,7 +85,7 @@ export async function getFeed(): Promise<FeedItem[]> {
       };
     });
 
-    return {
+    const item: FeedItem = {
       id: post.id,
       author: author?.name ?? 'Utilisateur',
       authorAvatar: author?.avatar_url ?? '',
@@ -69,27 +98,15 @@ export async function getFeed(): Promise<FeedItem[]> {
       location: post.location ?? '',
       timestamp: new Date(post.created_at).toISOString(),
     };
+
+    if (viewerId) {
+      item.hasLiked = (post.likes ?? []).some((l) => l.user_id === viewerId);
+    }
+
+    return item;
   });
   } catch (error) {
     console.error('Feed service error:', error);
-    return getSeedFeed();
+    return [];
   }
-}
-
-function getSeedFeed(): FeedItem[] {
-  return [
-    {
-      id: 'seed-1',
-      author: 'Alex Voyageur',
-      authorAvatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100&h=100&fit=crop',
-      authorCountryFlag: '🇲🇬',
-      media: [{ type: 'image', url: 'https://images.unsplash.com/photo-1533105079780-92b9be482077?w=800&q=80' }],
-      content: 'Vue incroyable depuis le Rova ce matin ! Madagascar est magique.',
-      likes: 42,
-      commentsList: [],
-      isBusiness: false,
-      location: 'Antananarivo',
-      timestamp: new Date().toISOString(),
-    },
-  ];
 }

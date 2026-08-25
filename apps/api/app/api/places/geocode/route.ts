@@ -1,5 +1,5 @@
 import { errorResponse, jsonResponse, optionsResponse } from '@/lib/api/response';
-import { getCoordinatesFromAddress, identifyLocation } from '@/services/geminiService';
+import { getCityCoordinates, identifyCity } from '@/services/locationService';
 
 export async function POST(request: Request) {
   try {
@@ -7,12 +7,12 @@ export async function POST(request: Request) {
 
     if (body.action === 'identify') {
       if (!body.query) return errorResponse('query is required', 400);
-      const result = await identifyLocation(body.query);
+      const result = await identifyCity(body.query);
       return jsonResponse({ result });
     }
 
     if (!body.address) return errorResponse('address is required', 400);
-    const coords = await getCoordinatesFromAddress(body.address);
+    const coords = await getCityCoordinates(body.address);
     return jsonResponse({ coords });
   } catch (error) {
     console.error('POST /api/places/geocode', error);

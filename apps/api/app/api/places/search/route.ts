@@ -1,21 +1,23 @@
 import type { PlacesSearchRequest } from '@zaha/shared';
 import { errorResponse, jsonResponse, optionsResponse } from '@/lib/api/response';
-import { searchNearbyPlaces } from '@/services/geminiService';
+import { searchNearbyPlaces } from '@/services/locationService';
 
 export async function POST(request: Request) {
   try {
-    const body = (await request.json()) as PlacesSearchRequest;
+    const body = (await request.json()) as Partial<PlacesSearchRequest>;
 
-    if (!body.category || !body.coords) {
-      return errorResponse('category and coords are required', 400);
+    if (!body.category || !body.category.trim()) {
+      return errorResponse('category is required', 400);
     }
 
+    // coords et locationName sont optionnels : sans eux, la recherche
+    // porte sur TOUS les lieux correspondant aux critères.
     const result = await searchNearbyPlaces(
-      body.category,
-      body.coords,
+      body.category.trim(),
+      body.coords ?? null,
+      body.locationName,
       body.filter,
-      body.searchQuery,
-      body.locationName
+      body.searchQuery
     );
 
     return jsonResponse(result);

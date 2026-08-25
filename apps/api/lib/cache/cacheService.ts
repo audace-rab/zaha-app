@@ -1,4 +1,5 @@
 import { createAdminClient } from '@/lib/supabase/server';
+import type { Json } from '@/lib/supabase/database.types';
 
 export async function cacheGet<T>(key: string): Promise<T | null> {
   try {
@@ -28,7 +29,7 @@ export async function cacheSet<T>(key: string, data: T, ttlMinutes = 60): Promis
 
     await supabase.from('ai_cache').upsert({
       cache_key: key,
-      payload: data as object,
+      payload: data as unknown as Json,
       expires_at: expiresAt,
     });
   } catch (error) {

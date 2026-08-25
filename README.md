@@ -1,6 +1,6 @@
 # Zaha App — Monorepo
 
-Application mobile de voyage (Madagascar) avec **React Native (Expo)**, backend **Next.js** et base **Supabase (PostgreSQL)**.
+Application mobile de voyage (Madagascar) avec **React Native Android/iOS natif** (gestion native du projet Android), backend **Next.js** et base **Supabase (PostgreSQL)**.
 
 ## Structure
 
@@ -19,9 +19,9 @@ zaha-app-v2/
 ## Prérequis
 
 - Node.js 20+
+- Android Studio + SDK Android (ou Xcode pour iOS)
 - Compte [Supabase](https://supabase.com)
 - Clé API [Google Gemini](https://aistudio.google.com/apikey)
-- [Expo Go](https://expo.dev/go) sur téléphone (dev mobile)
 
 ## 1. Configuration Supabase
 
@@ -61,12 +61,22 @@ npm install
 npm run dev:api
 ```
 
-**Terminal 2 — Mobile :**
+**Terminal 2 — Mobile (Android natif) :**
 ```bash
 npm run dev:mobile
 ```
 
-Scannez le QR code avec Expo Go.
+Pour démarrer directement sur Android :
+```bash
+cd apps/mobile
+npx react-native start
+npx react-native run-android
+```
+
+Ou via le workspace racine :
+```bash
+npm run android:mobile
+```
 
 ## API Endpoints
 
@@ -82,7 +92,7 @@ Scannez le QR code avec Expo Go.
 
 | Couche | Technologie |
 |--------|-------------|
-| Mobile | React Native 0.86 + Expo 57 |
+| Mobile | React Native 0.86 (Android / iOS natif) |
 | Backend | Next.js 16 (App Router) |
 | BDD | Supabase (PostgreSQL + Auth + Storage) |
 | IA | Google Gemini (côté serveur) |
