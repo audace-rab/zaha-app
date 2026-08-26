@@ -116,7 +116,7 @@ export default function ReservationHistoryScreen() {
       />
 
       <FlatList
-        data={filtered}
+        data={reservations}
         keyExtractor={(item) => item.id}
         contentContainerStyle={styles.list}
         refreshControl={
