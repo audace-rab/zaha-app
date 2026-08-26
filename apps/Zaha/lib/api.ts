@@ -107,6 +107,7 @@ type ProfileUpdateData = {
   name?: string;
   bio?: string;
   website?: string;
+  avatar_url?: string;
 };
 
 type ChatResponse = {

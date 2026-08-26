@@ -120,6 +120,7 @@ export default function ProfileScreen({ onOpenFavorites }: ProfileScreenProps) {
         name: editName.trim(),
         bio: editBio.trim() || undefined,
         website: editWebsite.trim() || undefined,
+        avatar_url: avatarUrl ?? undefined,
       });
 
       setProfile({
