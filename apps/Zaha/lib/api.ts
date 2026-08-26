@@ -139,17 +139,24 @@ export type { MapPlace, Profile, Review };
 
 // Upload en multipart : ne PAS forcer Content-Type JSON (boundary automatique).
 async function apiUpload<T>(path: string, formData: FormData): Promise<T> {
-  const response = await fetch(`${API_URL}${path}`, {
-    method: 'POST',
-    body: formData,
-  });
+  try {
+    const response = await fetch(`${API_URL}${path}`, {
+      method: 'POST',
+      body: formData,
+    });
 
-  if (!response.ok) {
-    const error = await response.json().catch(() => ({}));
-    throw new Error(error.error ?? `API error ${response.status}`);
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}));
+      throw new Error(error.error ?? `API error ${response.status}`);
+    }
+
+    return response.json();
+  } catch (e: any) {
+    if (e?.message?.includes('Network') || e?.name === 'TypeError') {
+      throw new Error('Erreur réseau — vérifie ta connexion ou réessaie plus tard.');
+    }
+    throw e;
   }
-
-  return response.json();
 }
 
 export const api = {

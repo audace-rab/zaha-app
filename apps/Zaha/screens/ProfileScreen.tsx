@@ -79,7 +79,9 @@ export default function ProfileScreen({ onOpenFavorites }: ProfileScreenProps) {
       const result = await launchImageLibrary({
         mediaType: 'photo',
         selectionLimit: 1,
-        quality: 0.8,
+        quality: 0.5,
+        maxWidth: 800,
+        maxHeight: 800,
       });
       if (result.didCancel) return;
       const asset = result.assets?.[0];

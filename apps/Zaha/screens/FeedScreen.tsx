@@ -74,7 +74,7 @@ export default function FeedScreen({ query, onClearSearch }: FeedScreenProps) {
 
   useEffect(() => {
     const showSub = Keyboard.addListener('keyboardDidShow', (e) => {
-      setKeyboardHeight(e.endCoordinates.height + 20);
+      setKeyboardHeight(e.endCoordinates.height + 20); // Bug android
     });
     const hideSub = Keyboard.addListener('keyboardDidHide', () => {
       setKeyboardHeight(0);

@@ -43,7 +43,7 @@ export default function ChatScreen() {
 
   useEffect(() => {
     const showSub = Keyboard.addListener('keyboardDidShow', (e) => {
-      setKeyboardHeight(e.endCoordinates.height);
+      setKeyboardHeight(e.endCoordinates.height - 35); // Bug android
       setTimeout(() => listRef.current?.scrollToEnd({ animated: true }), 100);
     });
     const hideSub = Keyboard.addListener('keyboardDidHide', () => {
