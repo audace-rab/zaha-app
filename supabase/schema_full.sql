@@ -25,10 +25,16 @@ create table if not exists public.profiles (
   country text not null default 'Madagascar',
   country_flag text default '🇲🇬',
   description text default '',
+  bio text,
+  website text,
   profile_views integer not null default 0,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
+
+-- Colonnes profil Phase 1 : idempotent pour les bases déjà créées sans bio/site
+alter table public.profiles add column if not exists bio text;
+alter table public.profiles add column if not exists website text;
 
 -- ----------------------------------------------------------------------------
 -- 2.2 Villes (référentiel géographique — PAS des lieux)
@@ -129,6 +135,38 @@ create table if not exists public.ai_cache (
   created_at timestamptz not null default now()
 );
 
+-- ----------------------------------------------------------------------------
+-- 2.6 Bookmarks de lieux (favoris par utilisateur)
+-- ----------------------------------------------------------------------------
+create table if not exists public.bookmarks (
+  id uuid primary key default uuid_generate_v4(),
+  user_id uuid not null references public.profiles(id) on delete cascade,
+  place_id uuid not null references public.places(id) on delete cascade,
+  created_at timestamptz not null default now(),
+  unique(user_id, place_id)
+);
+
+-- 2.7 Avis sur les lieux
+create table if not exists public.place_reviews (
+  id uuid primary key default uuid_generate_v4(),
+  user_id uuid not null references public.profiles(id) on delete cascade,
+  place_id uuid not null references public.places(id) on delete cascade,
+  rating int not null check (rating >= 1 and rating <= 5),
+  comment text,
+  created_at timestamptz not null default now(),
+  unique(user_id, place_id)
+);
+
+-- 2.8 Follows entre utilisateurs
+create table if not exists public.follows (
+  id uuid primary key default uuid_generate_v4(),
+  follower_id uuid not null references public.profiles(id) on delete cascade,
+  following_id uuid not null references public.profiles(id) on delete cascade,
+  created_at timestamptz not null default now(),
+  unique(follower_id, following_id),
+  check (follower_id != following_id)
+);
+
 -- ============================================================================
 -- 3. INDEX
 -- ============================================================================
@@ -148,6 +186,13 @@ create index if not exists post_media_post_idx on public.post_media (post_id);
 create index if not exists comments_post_idx on public.comments (post_id);
 
 create index if not exists ai_cache_expires_idx on public.ai_cache (expires_at);
+
+create index if not exists bookmarks_user_idx on public.bookmarks (user_id);
+create index if not exists bookmarks_place_idx on public.bookmarks (place_id);
+
+create index if not exists reviews_place_idx on public.place_reviews (place_id);
+create index if not exists follows_follower_idx on public.follows (follower_id);
+create index if not exists follows_following_idx on public.follows (following_id);
 
 -- ============================================================================
 -- 4. FONCTION + TRIGGER : auto-création du profil à l'inscription
@@ -185,6 +230,9 @@ alter table public.post_media enable row level security;
 alter table public.comments enable row level security;
 alter table public.likes enable row level security;
 alter table public.ai_cache enable row level security;
+alter table public.bookmarks enable row level security;
+alter table public.place_reviews enable row level security;
+alter table public.follows enable row level security;
 
 -- Profiles : lecture publique, édition par le propriétaire
 drop policy if exists "Profiles are viewable by everyone" on public.profiles;
@@ -262,6 +310,49 @@ drop policy if exists "Users can unlike" on public.likes;
 create policy "Users can unlike"
   on public.likes for delete using (auth.uid() = user_id);
 
+-- Bookmarks : strictement owner-only (lecture ET écriture)
+drop policy if exists "Bookmarks are viewable by owner" on public.bookmarks;
+create policy "Bookmarks are viewable by owner"
+  on public.bookmarks for select using (auth.uid() = user_id);
+
+drop policy if exists "Bookmarks are insertable by owner" on public.bookmarks;
+create policy "Bookmarks are insertable by owner"
+  on public.bookmarks for insert with check (auth.uid() = user_id);
+
+drop policy if exists "Bookmarks are deletable by owner" on public.bookmarks;
+create policy "Bookmarks are deletable by owner"
+  on public.bookmarks for delete using (auth.uid() = user_id);
+
+-- Avis lieux : lecture publique, écriture par le propriétaire
+drop policy if exists "Place reviews viewable by everyone" on public.place_reviews;
+create policy "Place reviews viewable by everyone"
+  on public.place_reviews for select using (true);
+
+drop policy if exists "Authenticated users can review places" on public.place_reviews;
+create policy "Authenticated users can review places"
+  on public.place_reviews for insert with check (auth.uid() = user_id);
+
+drop policy if exists "Review owners can update own review" on public.place_reviews;
+create policy "Review owners can update own review"
+  on public.place_reviews for update using (auth.uid() = user_id);
+
+drop policy if exists "Review owners can delete own review" on public.place_reviews;
+create policy "Review owners can delete own review"
+  on public.place_reviews for delete using (auth.uid() = user_id);
+
+-- Follows : lecture publique, follow/unfollow par le propriétaire
+drop policy if exists "Follows are viewable by everyone" on public.follows;
+create policy "Follows are viewable by everyone"
+  on public.follows for select using (true);
+
+drop policy if exists "Authenticated users can follow" on public.follows;
+create policy "Authenticated users can follow"
+  on public.follows for insert with check (auth.uid() = follower_id);
+
+drop policy if exists "Users can unfollow" on public.follows;
+create policy "Users can unfollow"
+  on public.follows for delete using (auth.uid() = follower_id);
+
 -- Cache IA : service_role uniquement (bypass RLS).
 -- Aucune policy => inaccessible aux clients anon/authenticated, ce qui est
 -- voulu : seule l'API (clé service_role) lit/écrit le cache.
@@ -288,6 +379,55 @@ drop policy if exists "Users delete own post media" on storage.objects;
 create policy "Users delete own post media"
   on storage.objects for delete
   using (bucket_id = 'post-media' and auth.uid()::text = (storage.foldername(name))[1]);
+
+-- Bucket public pour les photos de profil (lecture publique, écriture owner-only,
+-- un dossier par utilisateur : avatars/<user_id>/<fichier>)
+insert into storage.buckets (id, name, public)
+values ('avatars', 'avatars', true)
+on conflict (id) do update set public = true;
+
+drop policy if exists "Public read avatars" on storage.objects;
+create policy "Public read avatars"
+  on storage.objects for select
+  using (bucket_id = 'avatars');
+
+drop policy if exists "Authenticated users upload avatar" on storage.objects;
+create policy "Authenticated users upload avatar"
+  on storage.objects for insert
+  with check (
+    bucket_id = 'avatars'
+    and auth.role() = 'authenticated'
+    and auth.uid()::text = (storage.foldername(name))[1]
+  );
+
+drop policy if exists "Users delete own avatar" on storage.objects;
+create policy "Users delete own avatar"
+  on storage.objects for delete
+  using (bucket_id = 'avatars' and auth.uid()::text = (storage.foldername(name))[1]);
+
+-- Bucket public pour les photos de posts (upload avant création du post)
+insert into storage.buckets (id, name, public)
+values ('post-photos', 'post-photos', true)
+on conflict (id) do update set public = true;
+
+drop policy if exists "Public read post photos" on storage.objects;
+create policy "Public read post photos"
+  on storage.objects for select
+  using (bucket_id = 'post-photos');
+
+drop policy if exists "Authenticated users upload post photos" on storage.objects;
+create policy "Authenticated users upload post photos"
+  on storage.objects for insert
+  with check (
+    bucket_id = 'post-photos'
+    and auth.role() = 'authenticated'
+    and auth.uid()::text = (storage.foldername(name))[1]
+  );
+
+drop policy if exists "Users delete own post photos" on storage.objects;
+create policy "Users delete own post photos"
+  on storage.objects for delete
+  using (bucket_id = 'post-photos' and auth.uid()::text = (storage.foldername(name))[1]);
 
 -- ============================================================================
 -- 7. SEED : VILLES (source : CITY_COORDINATES du legacy geminiService.ts)

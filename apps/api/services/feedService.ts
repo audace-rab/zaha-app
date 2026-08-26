@@ -1,5 +1,6 @@
 import type { FeedItem } from '@zaha/shared';
 import { createAdminClient } from '@/lib/supabase/server';
+import { getFollowingIds } from '@/services/followService';
 
 export interface FeedFilters {
   location?: string;
@@ -14,6 +15,16 @@ function sanitizeIlike(value: string): string {
 export async function getFeed(filters?: FeedFilters): Promise<FeedItem[]> {
   try {
     const supabase = createAdminClient();
+
+    // Quand userId est fourni, ne montrer que les posts des users suivis
+    let followedIds: string[] | null = null;
+    const viewerId = filters?.userId?.trim() || undefined;
+
+    if (viewerId) {
+      const ids = await getFollowingIds(viewerId);
+      if (ids.size === 0) return [];
+      followedIds = [...ids];
+    }
 
   let dbQuery = supabase
     .from('posts')
@@ -41,6 +52,10 @@ export async function getFeed(filters?: FeedFilters): Promise<FeedItem[]> {
     .order('created_at', { ascending: false })
     .limit(50);
 
+  if (followedIds) {
+    dbQuery = dbQuery.in('author_id', followedIds);
+  }
+
   // Filtres optionnels : par défaut, TOUT le feed est renvoyé.
   const location = filters?.location?.trim();
   if (location) {
@@ -63,9 +78,6 @@ export async function getFeed(filters?: FeedFilters): Promise<FeedItem[]> {
   }
 
   if (!posts?.length) return [];
-
-  // liked par post uniquement si un userId est fourni (sinon contrat inchangé)
-  const viewerId = filters?.userId?.trim() || undefined;
 
   return posts.map((post) => {
     const author = Array.isArray(post.author) ? post.author[0] : post.author;

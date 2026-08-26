@@ -401,6 +401,61 @@ export async function listAllPlaces(): Promise<PlaceMapPoint[]> {
   return places;
 }
 
+// ---------------------------------------------------------------------------
+// Lieux à proximité ("Autour de moi") — Haversine côté API, sans dépendance
+// PostGIS : volume de lieux faible et liste déjà en cache 60s.
+// ---------------------------------------------------------------------------
+
+export interface PlaceNearbyPoint extends PlaceMapPoint {
+  distance: number; // mètres
+}
+
+function haversineMeters(
+  lat1: number,
+  lon1: number,
+  lat2: number,
+  lon2: number
+): number {
+  const R = 6371000;
+  const toRad = (deg: number) => (deg * Math.PI) / 180;
+  const dLat = toRad(lat2 - lat1);
+  const dLon = toRad(lon2 - lon1);
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(a));
+}
+
+export async function listNearbyPlaces(
+  latitude: number,
+  longitude: number,
+  radius = 5000,
+  limit = 50
+): Promise<PlaceNearbyPoint[]> {
+  const places = await listAllPlaces();
+  return places
+    .map((place) => ({
+      ...place,
+      distance: haversineMeters(latitude, longitude, place.latitude, place.longitude),
+    }))
+    .filter((point) => point.distance <= radius)
+    .sort((a, b) => a.distance - b.distance)
+    .slice(0, limit);
+}
+
+export async function countPlacesByCategory(): Promise<
+  { category: string; count: number }[]
+> {
+  const places = await listAllPlaces();
+  const counts = new Map<string, number>();
+  for (const place of places) {
+    counts.set(place.category, (counts.get(place.category) ?? 0) + 1);
+  }
+  return [...counts.entries()]
+    .map(([category, count]) => ({ category, count }))
+    .sort((a, b) => b.count - a.count || a.category.localeCompare(b.category));
+}
+
 /**
  * Chercher des lieux à proximité (restaurants, hôtels, etc.).
  * Source primaire : table Supabase `places` (seed + enrichissements).

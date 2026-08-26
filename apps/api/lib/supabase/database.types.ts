@@ -21,6 +21,8 @@ export interface Database {
           country: string;
           country_flag: string | null;
           description: string | null;
+          bio: string | null;
+          website: string | null;
           profile_views: number;
           created_at: string;
           updated_at: string;
@@ -36,6 +38,8 @@ export interface Database {
           country?: string;
           country_flag?: string | null;
           description?: string | null;
+          bio?: string | null;
+          website?: string | null;
           profile_views?: number;
           created_at?: string;
           updated_at?: string;
@@ -51,6 +55,8 @@ export interface Database {
           country?: string;
           country_flag?: string | null;
           description?: string | null;
+          bio?: string | null;
+          website?: string | null;
           profile_views?: number;
           created_at?: string;
           updated_at?: string;
@@ -320,6 +326,120 @@ export interface Database {
           {
             foreignKeyName: 'likes_user_id_fkey';
             columns: ['user_id'];
+            isOneToOne: false;
+            referencedRelation: 'profiles';
+            referencedColumns: ['id'];
+          }
+        ];
+      };
+      bookmarks: {
+        Row: {
+          id: string;
+          user_id: string;
+          place_id: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          place_id: string;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          place_id?: string;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'bookmarks_user_id_fkey';
+            columns: ['user_id'];
+            isOneToOne: false;
+            referencedRelation: 'profiles';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'bookmarks_place_id_fkey';
+            columns: ['place_id'];
+            isOneToOne: false;
+            referencedRelation: 'places';
+            referencedColumns: ['id'];
+          }
+        ];
+      };
+      place_reviews: {
+        Row: {
+          id: string;
+          user_id: string;
+          place_id: string;
+          rating: number;
+          comment: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          place_id: string;
+          rating: number;
+          comment?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          place_id?: string;
+          rating?: number;
+          comment?: string | null;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'place_reviews_user_id_fkey';
+            columns: ['user_id'];
+            isOneToOne: false;
+            referencedRelation: 'profiles';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'place_reviews_place_id_fkey';
+            columns: ['place_id'];
+            isOneToOne: false;
+            referencedRelation: 'places';
+            referencedColumns: ['id'];
+          }
+        ];
+      };
+      follows: {
+        Row: {
+          id: string;
+          follower_id: string;
+          following_id: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          follower_id: string;
+          following_id: string;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          follower_id?: string;
+          following_id?: string;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'follows_follower_id_fkey';
+            columns: ['follower_id'];
+            isOneToOne: false;
+            referencedRelation: 'profiles';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'follows_following_id_fkey';
+            columns: ['following_id'];
             isOneToOne: false;
             referencedRelation: 'profiles';
             referencedColumns: ['id'];
