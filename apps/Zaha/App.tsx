@@ -8,8 +8,9 @@ import FeedScreen from './screens/FeedScreen';
 import PlaceDetailScreen from './screens/PlaceDetailScreen';
 import PlacesScreen from './screens/PlacesScreen';
 import ProfileScreen from './screens/ProfileScreen';
+import ReservationHistoryScreen from './screens/ReservationHistoryScreen';
 
-type Tab = 'feed' | 'places' | 'chat' | 'profile';
+type Tab = 'feed' | 'places' | 'reservations' | 'chat' | 'profile';
 
 type SelectedPlace = {
   id: string;
@@ -166,6 +167,7 @@ function AppInner() {
           </View>
         )}
         {tab === 'chat' && <ChatScreen />}
+        {tab === 'reservations' && <ReservationHistoryScreen />}
         {tab === 'profile' && (
           <ProfileScreen onOpenFavorites={() => setTab('places')} />
         )}
@@ -176,6 +178,7 @@ function AppInner() {
           [
             { id: 'feed', label: 'Feed' },
             { id: 'places', label: 'Lieux' },
+            { id: 'reservations', label: '📅 Réservations' },
             { id: 'chat', label: 'Zaha AI' },
             { id: 'profile', label: 'Profil' },
           ] as const

@@ -446,6 +446,84 @@ export interface Database {
           }
         ];
       };
+      reservations: {
+        Row: {
+          id: string;
+          user_id: string;
+          place_id: string;
+          reservation_type: string;
+          date: string;
+          time_start: string | null;
+          time_end: string | null;
+          guests: number;
+          room_type: string | null;
+          activity_slot: string | null;
+          price: number;
+          currency: string;
+          status: string;
+          payment_method: string | null;
+          payment_status: string;
+          note: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          place_id: string;
+          reservation_type?: string;
+          date: string;
+          time_start?: string | null;
+          time_end?: string | null;
+          guests?: number;
+          room_type?: string | null;
+          activity_slot?: string | null;
+          price?: number;
+          currency?: string;
+          status?: string;
+          payment_method?: string | null;
+          payment_status?: string;
+          note?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          place_id?: string;
+          reservation_type?: string;
+          date?: string;
+          time_start?: string | null;
+          time_end?: string | null;
+          guests?: number;
+          room_type?: string | null;
+          activity_slot?: string | null;
+          price?: number;
+          currency?: string;
+          status?: string;
+          payment_method?: string | null;
+          payment_status?: string;
+          note?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'reservations_user_id_fkey';
+            columns: ['user_id'];
+            isOneToOne: false;
+            referencedRelation: 'profiles';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'reservations_place_id_fkey';
+            columns: ['place_id'];
+            isOneToOne: false;
+            referencedRelation: 'places';
+            referencedColumns: ['id'];
+          }
+        ];
+      };
       ai_cache: {
         Row: {
           cache_key: string;

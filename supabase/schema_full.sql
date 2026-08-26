@@ -167,6 +167,30 @@ create table if not exists public.follows (
   check (follower_id != following_id)
 );
 
+-- ----------------------------------------------------------------------------
+-- 2.9 Réservations (système de réservation complet)
+-- ----------------------------------------------------------------------------
+create table if not exists public.reservations (
+  id uuid primary key default uuid_generate_v4(),
+  user_id uuid not null references public.profiles(id) on delete cascade,
+  place_id uuid not null references public.places(id) on delete cascade,
+  reservation_type text not null default 'general',
+  date date not null,
+  time_start time,
+  time_end time,
+  guests int default 1,
+  room_type text,
+  activity_slot text,
+  price decimal(10,2) default 0,
+  currency text default 'MGA',
+  status text default 'pending',
+  payment_method text,
+  payment_status text default 'unpaid',
+  note text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
 -- ============================================================================
 -- 3. INDEX
 -- ============================================================================
@@ -193,6 +217,11 @@ create index if not exists bookmarks_place_idx on public.bookmarks (place_id);
 create index if not exists reviews_place_idx on public.place_reviews (place_id);
 create index if not exists follows_follower_idx on public.follows (follower_id);
 create index if not exists follows_following_idx on public.follows (following_id);
+
+create index if not exists reservations_user_idx on public.reservations (user_id);
+create index if not exists reservations_place_idx on public.reservations (place_id);
+create index if not exists reservations_date_idx on public.reservations (date);
+create index if not exists reservations_status_idx on public.reservations (status);
 
 -- ============================================================================
 -- 4. FONCTION + TRIGGER : auto-création du profil à l'inscription
@@ -233,6 +262,7 @@ alter table public.ai_cache enable row level security;
 alter table public.bookmarks enable row level security;
 alter table public.place_reviews enable row level security;
 alter table public.follows enable row level security;
+alter table public.reservations enable row level security;
 
 -- Profiles : lecture publique, édition par le propriétaire
 drop policy if exists "Profiles are viewable by everyone" on public.profiles;
@@ -352,6 +382,23 @@ create policy "Authenticated users can follow"
 drop policy if exists "Users can unfollow" on public.follows;
 create policy "Users can unfollow"
   on public.follows for delete using (auth.uid() = follower_id);
+
+-- Réservations : lecture/écriture propriétaire uniquement
+drop policy if exists "Reservations viewable by owner" on public.reservations;
+create policy "Reservations viewable by owner"
+  on public.reservations for select using (auth.uid() = user_id);
+
+drop policy if exists "Users create own reservations" on public.reservations;
+create policy "Users create own reservations"
+  on public.reservations for insert with check (auth.uid() = user_id);
+
+drop policy if exists "Users update own reservations" on public.reservations;
+create policy "Users update own reservations"
+  on public.reservations for update using (auth.uid() = user_id);
+
+drop policy if exists "Users delete own reservations" on public.reservations;
+create policy "Users delete own reservations"
+  on public.reservations for delete using (auth.uid() = user_id);
 
 -- Cache IA : service_role uniquement (bypass RLS).
 -- Aucune policy => inaccessible aux clients anon/authenticated, ce qui est

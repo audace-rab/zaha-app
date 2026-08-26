@@ -115,6 +115,41 @@ type ChatResponse = {
   sources?: { uri: string; title: string }[];
 };
 
+export type Reservation = {
+  id: string;
+  user_id: string;
+  place_id: string;
+  place_name?: string;
+  reservation_type: 'table' | 'hotel' | 'activity' | 'general';
+  date: string;
+  time_start?: string;
+  time_end?: string;
+  guests: number;
+  room_type?: string;
+  activity_slot?: string;
+  price?: number;
+  currency?: string;
+  status: 'pending' | 'confirmed' | 'cancelled' | 'completed';
+  payment_method?: string;
+  payment_status?: string;
+  note?: string;
+  created_at: string;
+  updated_at: string;
+};
+
+export type CreateReservationData = {
+  userId: string;
+  placeId: string;
+  reservationType?: string;
+  date: string;
+  timeStart?: string;
+  timeEnd?: string;
+  guests?: number;
+  roomType?: string;
+  activitySlot?: string;
+  note?: string;
+};
+
 import { config } from '../config';
 
 const API_URL = config.api.baseUrl;
@@ -302,4 +337,46 @@ export const api = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ userId, rating, comment: comment?.trim() || undefined }),
     }),
+
+  createReservation: (data: CreateReservationData) =>
+    apiFetch<{ reservation: Reservation }>('/api/reservations', {
+      method: 'POST',
+      body: JSON.stringify({
+        userId: data.userId,
+        placeId: data.placeId,
+        reservationType: data.reservationType ?? 'general',
+        date: data.date,
+        timeStart: data.timeStart,
+        timeEnd: data.timeEnd,
+        guests: data.guests ?? 1,
+        roomType: data.roomType,
+        activitySlot: data.activitySlot,
+        note: data.note,
+      }),
+    }),
+
+  getReservations: (userId: string, status?: string) => {
+    const params = new URLSearchParams({ userId });
+    if (status?.trim()) params.set('status', status.trim());
+    return apiFetch<{ reservations: Reservation[] }>(`/api/reservations?${params.toString()}`);
+  },
+
+  getReservation: (id: string) =>
+    apiFetch<{ reservation: Reservation }>(`/api/reservations/${id}`),
+
+  cancelReservation: (id: string) =>
+    apiFetch<{ reservation: Reservation }>(`/api/reservations/${id}`, {
+      method: 'DELETE',
+    }),
+
+  updateReservation: (id: string, data: Partial<CreateReservationData>) =>
+    apiFetch<{ reservation: Reservation }>(`/api/reservations/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    }),
+
+  getAvailability: (placeId: string, date: string) =>
+    apiFetch<{ available: boolean; slots: string[] }>(
+      `/api/places/${placeId}/reservations?date=${date}`
+    ),
 };

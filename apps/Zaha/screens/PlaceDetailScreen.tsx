@@ -16,6 +16,7 @@ import {
 import MapView, { Marker } from 'react-native-maps';
 import { api } from '../lib/api';
 import { supabase } from '../lib/supabase';
+import ReservationScreen from './ReservationScreen';
 
 const DEMO_USER_ID = 'a1000000-0000-0000-0000-000000000001';
 
@@ -67,6 +68,7 @@ export default function PlaceDetailScreen({ place }: PlaceDetailScreenProps) {
   const [formComment, setFormComment] = useState('');
   const [formSubmitting, setFormSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
+  const [showReservation, setShowReservation] = useState(false);
   const { width: screenWidth } = useWindowDimensions();
 
   // Galerie : photos[] si disponible, complétée par photoUrl (déduupliquée).
@@ -221,7 +223,26 @@ export default function PlaceDetailScreen({ place }: PlaceDetailScreenProps) {
   };
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+    <View style={styles.container}>
+      {showReservation && place ? (
+        <View style={styles.reservationOverlay}>
+          <View style={styles.reservationHeader}>
+            <TouchableOpacity
+              onPress={() => setShowReservation(false)}
+              accessibilityRole="button"
+              accessibilityLabel="Retour au lieu"
+              style={styles.backButton}
+            >
+              <Text style={styles.backButtonText}>← Retour</Text>
+            </TouchableOpacity>
+          </View>
+          <ReservationScreen
+            place={{ id: place.id, name: place.name, address: place.address }}
+            onDone={() => setShowReservation(false)}
+          />
+        </View>
+      ) : (
+    <ScrollView style={styles.scrollView} contentContainerStyle={styles.content}>
       {photoList.length > 1 ? (
         <View style={styles.gallery}>
           <FlatList
@@ -332,6 +353,14 @@ export default function PlaceDetailScreen({ place }: PlaceDetailScreenProps) {
             onPress={sharePlace}
           >
             <Text style={styles.shareButtonText}>Partager</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.actionButton, styles.reserveButton]}
+            onPress={() => setShowReservation(true)}
+            accessibilityRole="button"
+            accessibilityLabel="Réserver ce lieu"
+          >
+            <Text style={styles.reserveButtonText}>📅 Réserver</Text>
           </TouchableOpacity>
         </View>
 
@@ -498,11 +527,25 @@ export default function PlaceDetailScreen({ place }: PlaceDetailScreenProps) {
         </View>
       </View>
     </ScrollView>
+      )}
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#f9fafb' },
+  scrollView: { flex: 1, backgroundColor: '#f9fafb' },
+  reservationOverlay: { flex: 1, backgroundColor: '#f9fafb' },
+  reservationHeader: {
+    paddingHorizontal: 16,
+    paddingTop: 28,
+    paddingBottom: 8,
+    borderBottomWidth: 1,
+    borderColor: '#e5e7eb',
+    backgroundColor: '#fff',
+  },
+  backButton: { paddingVertical: 6 },
+  backButtonText: { color: '#2563eb', fontWeight: '600', fontSize: 15 },
   content: { paddingBottom: 24 },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24, gap: 16 },
   emptyTitle: { color: '#6b7280', fontSize: 15 },
@@ -554,6 +597,10 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
   },
   shareButtonText: { color: '#2563eb', fontWeight: '600', fontSize: 15 },
+  reserveButton: {
+    backgroundColor: '#2563eb',
+  },
+  reserveButtonText: { color: '#fff', fontWeight: '700', fontSize: 15 },
   bookmarkButton: {
     borderWidth: 1,
     borderColor: '#d1d5db',

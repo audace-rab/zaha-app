@@ -10,6 +10,6 @@ export const config = {
   },
   api: {
     // baseUrl: `http://${LOCAL_API_HOST}:3000`,
-    baseUrl: `https://zaha-5fsf2hacf-soad2.vercel.app/`,
+    baseUrl: `https://zaha-818owky0q-soad2.vercel.app/`,
   },
 };
