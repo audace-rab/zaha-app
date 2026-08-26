@@ -6,34 +6,30 @@ const MAX_AVATAR_BYTES = 5 * 1024 * 1024; // 5 Mo
 
 export async function POST(request: Request) {
   try {
-    const formData = await request.formData();
-    const userIdRaw = formData.get('userId');
-    const file = formData.get('file');
+    const body = await request.json();
+    const { userId: userIdRaw, file: base64Data } = body as { userId?: string; file?: string };
 
     const userId = typeof userIdRaw === 'string' ? userIdRaw.trim() : '';
     if (!userId || !isValidUuid(userId)) {
       return errorResponse('userId is required and must be a valid UUID', 400);
     }
-    if (!(file instanceof File)) {
-      return errorResponse('file is required (multipart/form-data)', 400);
+    if (!base64Data || typeof base64Data !== 'string') {
+      return errorResponse('file is required as base64 string', 400);
     }
-    if (!file.type.startsWith('image/')) {
-      return errorResponse('file must be an image', 400);
-    }
-    if (file.size > MAX_AVATAR_BYTES) {
+
+    // Strip data URL prefix if present (e.g. "data:image/jpeg;base64,...")
+    const base64Clean = base64Data.replace(/^data:[^;]+;base64,/, '');
+    const buffer = Buffer.from(base64Clean, 'base64');
+
+    if (buffer.length > MAX_AVATAR_BYTES) {
       return errorResponse('file too large (max 5 MB)', 400);
     }
 
-    const ext =
-      (file.name.split('.').pop() ?? 'jpg').toLowerCase().replace(/[^a-z0-9]/g, '') ||
-      'jpg';
-    const path = `${userId}/${Date.now()}.${ext}`;
-    const buffer = Buffer.from(await file.arrayBuffer());
-
+    const path = `${userId}/${Date.now()}.jpg`;
     const supabase = createAdminClient();
     const { error: uploadError } = await supabase.storage
       .from('avatars')
-      .upload(path, buffer, { contentType: file.type, upsert: false });
+      .upload(path, buffer, { contentType: 'image/jpeg', upsert: false });
 
     if (uploadError) {
       console.error('Avatar upload error:', uploadError);

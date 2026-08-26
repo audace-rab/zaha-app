@@ -240,16 +240,11 @@ export const api = {
       body: JSON.stringify({ userId, ...data }),
     }),
 
-  uploadAvatar: (userId: string, imageUri: string) => {
-    const formData = new FormData();
-    formData.append('userId', userId);
-    // Format RN : { uri, name, type } pour l'upload de fichier.
-    formData.append('file', {
-      uri: imageUri,
-      name: 'avatar.jpg',
-      type: 'image/jpeg',
-    } as unknown as Blob);
-    return apiUpload<{ url: string }>('/api/profile/avatar', formData);
+  uploadAvatar: (userId: string, base64Data: string) => {
+    return apiFetch<{ url: string }>('/api/profile/avatar', {
+      method: 'POST',
+      body: JSON.stringify({ userId, file: base64Data }),
+    });
   },
 
   fetchCategories: () =>

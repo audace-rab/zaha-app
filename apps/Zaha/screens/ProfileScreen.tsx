@@ -29,6 +29,7 @@ export default function ProfileScreen({ onOpenFavorites }: ProfileScreenProps) {
   const [editBio, setEditBio] = useState('');
   const [editWebsite, setEditWebsite] = useState('');
   const [pendingAvatarUri, setPendingAvatarUri] = useState<string | null>(null);
+  const [pendingAvatarBase64, setPendingAvatarBase64] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
@@ -69,6 +70,7 @@ export default function ProfileScreen({ onOpenFavorites }: ProfileScreenProps) {
     setEditBio(profile.bio ?? '');
     setEditWebsite(profile.website ?? '');
     setPendingAvatarUri(null);
+    setPendingAvatarBase64(null);
     setError(null);
     setSuccessMessage(null);
     setEditing(true);
@@ -82,14 +84,16 @@ export default function ProfileScreen({ onOpenFavorites }: ProfileScreenProps) {
         quality: 0.5,
         maxWidth: 800,
         maxHeight: 800,
+        includeBase64: true,
       });
       if (result.didCancel) return;
       const asset = result.assets?.[0];
-      if (!asset?.uri) {
-        setError('Aucune image sélectionnée.');
+      if (!asset?.base64) {
+        setError('Impossible de lire l\'image.');
         return;
       }
-      setPendingAvatarUri(asset.uri);
+      setPendingAvatarUri(asset.uri ?? null);
+      setPendingAvatarBase64(asset.base64 ?? null);
     } catch {
       setError('Impossible d’ouvrir la galerie. Vérifie les permissions.');
     }
@@ -107,8 +111,8 @@ export default function ProfileScreen({ onOpenFavorites }: ProfileScreenProps) {
     try {
       let avatarUrl: string | undefined;
 
-      if (pendingAvatarUri) {
-        const upload = await api.uploadAvatar(profile.id, pendingAvatarUri);
+      if (pendingAvatarUri && pendingAvatarBase64) {
+        const upload = await api.uploadAvatar(profile.id, pendingAvatarBase64);
         avatarUrl = upload.url;
       }
 
@@ -267,7 +271,8 @@ export default function ProfileScreen({ onOpenFavorites }: ProfileScreenProps) {
               <TouchableOpacity
                 onPress={() => {
                   setEditing(false);
-                  setPendingAvatarUri(null);
+      setPendingAvatarUri(null);
+      setPendingAvatarBase64(null);
                 }}
                 accessibilityRole="button"
                 accessibilityLabel="Annuler les modifications"
