@@ -246,8 +246,13 @@ async function queryPlaces(params: {
 
   let query = supabase
     .from('places')
-    .select('*')
-    .or(`category.eq."${safeCategory}",place_type.eq."${safeCategory}"`)
+    .select('*');
+
+  if (safeCategory && safeCategory !== 'all') {
+    query = query.or(`category.eq."${safeCategory}",place_type.eq."${safeCategory}"`);
+  }
+
+  query = query
     .order('rating', { ascending: false, nullsFirst: false })
     .limit(50);
 

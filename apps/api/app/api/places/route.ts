@@ -13,7 +13,7 @@ export async function GET(request: Request) {
     const places = await listAllPlaces();
     const reviewStats = await getReviewStatsMap();
 
-    let filtered = category
+    let filtered = category && category !== 'all'
       ? places.filter((place) => place.category.toLowerCase() === category.toLowerCase())
       : places;
 

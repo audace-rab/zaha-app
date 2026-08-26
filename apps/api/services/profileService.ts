@@ -1,5 +1,24 @@
 import { createAdminClient } from '@/lib/supabase/server';
 
+/**
+ * Récupère un profil par userId.
+ */
+export async function getProfile(userId: string) {
+  const supabase = createAdminClient();
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('*')
+    .eq('id', userId)
+    .maybeSingle();
+
+  if (error) {
+    console.error('Get profile error:', error);
+    throw new Error('Failed to fetch profile');
+  }
+
+  return data ?? null;
+}
+
 export interface UpdateProfileInput {
   userId: string;
   name?: string;
