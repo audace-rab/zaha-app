@@ -35,3 +35,7 @@ apps/mobile/.expo
 *.njsproj
 *.sln
 *.sw?
+
+# AI tools
+.codex/
+.opencode/
