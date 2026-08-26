@@ -22,8 +22,10 @@ export async function getFeed(filters?: FeedFilters): Promise<FeedItem[]> {
 
     if (viewerId) {
       const ids = await getFollowingIds(viewerId);
-      if (ids.size === 0) return [];
-      followedIds = [...ids];
+      if (ids.size > 0) {
+        followedIds = [...ids];
+      }
+      // Si ne suit personne → montrer tous les posts (pas de filtre)
     }
 
   let dbQuery = supabase
