@@ -4,6 +4,7 @@ import {
   Dimensions,
   FlatList,
   Image,
+  Keyboard,
   Modal,
   RefreshControl,
   ScrollView,
@@ -55,6 +56,7 @@ export default function FeedScreen({ query, onClearSearch }: FeedScreenProps) {
   const [postContent, setPostContent] = useState('');
   const [postPhotos, setPostPhotos] = useState<string[]>([]);
   const [creatingPost, setCreatingPost] = useState(false);
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
 
   useEffect(() => {
     const resolveUserId = async () => {
@@ -68,6 +70,16 @@ export default function FeedScreen({ query, onClearSearch }: FeedScreenProps) {
       }
     };
     resolveUserId();
+  }, []);
+
+  useEffect(() => {
+    const showSub = Keyboard.addListener('keyboardDidShow', (e) => {
+      setKeyboardHeight(e.endCoordinates.height + 20);
+    });
+    const hideSub = Keyboard.addListener('keyboardDidHide', () => {
+      setKeyboardHeight(0);
+    });
+    return () => { showSub.remove(); hideSub.remove(); };
   }, []);
 
   const load = useCallback(
@@ -309,7 +321,7 @@ export default function FeedScreen({ query, onClearSearch }: FeedScreenProps) {
       {/* Create post modal */}
       <Modal visible={createVisible} animationType="slide" transparent>
         <View style={styles.modalOverlay}>
-          <View style={styles.modalCard}>
+          <View style={[styles.modalCard, { marginBottom: keyboardHeight }]}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Nouveau post</Text>
               <TouchableOpacity onPress={() => { setCreateVisible(false); setPostContent(''); setPostPhotos([]); }} accessibilityRole="button" accessibilityLabel="Fermer">
