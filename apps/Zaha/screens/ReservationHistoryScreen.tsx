@@ -30,11 +30,7 @@ const STATUS_FILTERS: { key: StatusFilter; label: string }[] = [
   { key: 'cancelled', label: 'Annulées' },
 ];
 
-type ReservationHistoryScreenProps = {
-  onBack?: () => void;
-};
-
-export default function ReservationHistoryScreen({ onBack }: ReservationHistoryScreenProps) {
+export default function ReservationHistoryScreen() {
   const [reservations, setReservations] = useState<Reservation[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -97,15 +93,6 @@ export default function ReservationHistoryScreen({ onBack }: ReservationHistoryS
 
   return (
     <View style={styles.container}>
-      {onBack && (
-        <View style={styles.header}>
-          <TouchableOpacity onPress={onBack} accessibilityRole="button" accessibilityLabel="Retour au profil" style={styles.backBtn}>
-            <Text style={styles.backBtnText}>← Profil</Text>
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>Mes réservations</Text>
-        </View>
-      )}
-
       {/* Filtres par statut */}
       <FlatList
         horizontal
@@ -199,21 +186,7 @@ export default function ReservationHistoryScreen({ onBack }: ReservationHistoryS
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f9fafb' },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingTop: 28,
-    paddingBottom: 12,
-    borderBottomWidth: 1,
-    borderColor: '#e5e7eb',
-    backgroundColor: '#fff',
-    gap: 12,
-  },
-  backBtn: { paddingVertical: 4 },
-  backBtnText: { color: '#2563eb', fontWeight: '600', fontSize: 15 },
-  headerTitle: { fontSize: 17, fontWeight: '700', color: '#111827' },
+  container: { flex: 1, backgroundColor: '#f9fafb', justifyContent: 'flex-start' },
   filtersRow: { paddingHorizontal: 16, paddingVertical: 12, gap: 8 },
   filterChip: {
     height: 50,
@@ -227,7 +200,7 @@ const styles = StyleSheet.create({
   filterChipActive: { backgroundColor: '#2563eb', borderColor: '#2563eb' },
   filterText: { fontSize: 13, color: '#374151', fontWeight: '500' },
   filterTextActive: { color: '#fff' },
-  list: { padding: 16, paddingBottom: 40, alignContent: 'flex-start' },
+  list: { padding: 16, paddingBottom: 40, alignItems: 'flex-start' },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingVertical: 60 },
   emptyState: { alignItems: 'center', paddingVertical: 60, paddingHorizontal: 24 },
   emptyIcon: { fontSize: 44, marginBottom: 12 },

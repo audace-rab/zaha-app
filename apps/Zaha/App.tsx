@@ -174,9 +174,7 @@ function AppInner() {
             onOpenReservations={() => setShowReservations(true)}
           />
         )}
-        {tab === 'profile' && showReservations && (
-          <ReservationHistoryScreen onBack={() => setShowReservations(false)} />
-        )}
+        {tab === 'profile' && showReservations && <ReservationHistoryScreen />}
       </View>
 
       <View style={styles.tabs}>
