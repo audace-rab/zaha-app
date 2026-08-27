@@ -10,7 +10,7 @@ import PlacesScreen from './screens/PlacesScreen';
 import ProfileScreen from './screens/ProfileScreen';
 import ReservationHistoryScreen from './screens/ReservationHistoryScreen';
 
-type Tab = 'feed' | 'places' | 'reservations' | 'chat' | 'profile';
+type Tab = 'feed' | 'places' | 'chat' | 'profile';
 
 type SelectedPlace = {
   id: string;
@@ -34,6 +34,7 @@ export default function App() {
 function AppInner() {
   const [tab, setTab] = useState<Tab>('feed');
   const [selectedPlace, setSelectedPlace] = useState<SelectedPlace | null>(null);
+  const [showReservations, setShowReservations] = useState(false);
   const [session, setSession] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
@@ -167,10 +168,13 @@ function AppInner() {
           </View>
         )}
         {tab === 'chat' && <ChatScreen />}
-        {tab === 'reservations' && <ReservationHistoryScreen />}
-        {tab === 'profile' && (
-          <ProfileScreen onOpenFavorites={() => setTab('places')} />
+        {tab === 'profile' && !showReservations && (
+          <ProfileScreen
+            onOpenFavorites={() => setTab('places')}
+            onOpenReservations={() => setShowReservations(true)}
+          />
         )}
+        {tab === 'profile' && showReservations && <ReservationHistoryScreen />}
       </View>
 
       <View style={styles.tabs}>
@@ -178,7 +182,6 @@ function AppInner() {
           [
             { id: 'feed', label: 'Feed' },
             { id: 'places', label: 'Lieux' },
-            { id: 'reservations', label: '📅 Réservations' },
             { id: 'chat', label: 'Zaha AI' },
             { id: 'profile', label: 'Profil' },
           ] as const
@@ -186,7 +189,10 @@ function AppInner() {
           <TouchableOpacity
             key={item.id}
             style={[styles.tab, tab === item.id && styles.tabActive]}
-            onPress={() => setTab(item.id)}
+            onPress={() => {
+              setTab(item.id);
+              if (item.id !== 'profile') setShowReservations(false);
+            }}
           >
             <Text style={[styles.tabText, tab === item.id && styles.tabTextActive]}>
               {item.label}

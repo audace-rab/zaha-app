@@ -16,9 +16,10 @@ import { supabase } from '../lib/supabase';
 
 type ProfileScreenProps = {
   onOpenFavorites?: () => void;
+  onOpenReservations?: () => void;
 };
 
-export default function ProfileScreen({ onOpenFavorites }: ProfileScreenProps) {
+export default function ProfileScreen({ onOpenFavorites, onOpenReservations }: ProfileScreenProps) {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -214,6 +215,15 @@ export default function ProfileScreen({ onOpenFavorites }: ProfileScreenProps) {
               >
                 <Text style={styles.favoritesButtonText}>⭐ Mes favoris</Text>
               </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.actionButton, styles.reservationsButton]}
+                onPress={() => onOpenReservations?.()}
+                accessibilityRole="button"
+                accessibilityLabel="Voir mes réservations"
+              >
+                <Text style={styles.reservationsButtonText}>📅 Mes réservations</Text>
+              </TouchableOpacity>
             </>
           ) : (
             <>
@@ -350,6 +360,8 @@ const styles = StyleSheet.create({
   editButtonText: { color: '#fff', fontWeight: '600' },
   favoritesButton: { backgroundColor: '#fff', borderWidth: 1, borderColor: '#2563eb' },
   favoritesButtonText: { color: '#2563eb', fontWeight: '600' },
+  reservationsButton: { backgroundColor: '#fff', borderWidth: 1, borderColor: '#2563eb' },
+  reservationsButtonText: { color: '#2563eb', fontWeight: '600' },
   photoButton: { backgroundColor: '#f3f4f6' },
   photoButtonText: { color: '#374151', fontWeight: '600' },
   saveButton: { backgroundColor: '#2563eb' },

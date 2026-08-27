@@ -226,16 +226,6 @@ export default function PlaceDetailScreen({ place }: PlaceDetailScreenProps) {
     <View style={styles.container}>
       {showReservation && place ? (
         <View style={styles.reservationOverlay}>
-          <View style={styles.reservationHeader}>
-            <TouchableOpacity
-              onPress={() => setShowReservation(false)}
-              accessibilityRole="button"
-              accessibilityLabel="Retour au lieu"
-              style={styles.backButton}
-            >
-              <Text style={styles.backButtonText}>← Retour</Text>
-            </TouchableOpacity>
-          </View>
           <ReservationScreen
             place={{ id: place.id, name: place.name, address: place.address }}
             onDone={() => setShowReservation(false)}
@@ -536,16 +526,6 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#f9fafb' },
   scrollView: { flex: 1, backgroundColor: '#f9fafb' },
   reservationOverlay: { flex: 1, backgroundColor: '#f9fafb' },
-  reservationHeader: {
-    paddingHorizontal: 16,
-    paddingTop: 28,
-    paddingBottom: 8,
-    borderBottomWidth: 1,
-    borderColor: '#e5e7eb',
-    backgroundColor: '#fff',
-  },
-  backButton: { paddingVertical: 6 },
-  backButtonText: { color: '#2563eb', fontWeight: '600', fontSize: 15 },
   content: { paddingBottom: 24 },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24, gap: 16 },
   emptyTitle: { color: '#6b7280', fontSize: 15 },

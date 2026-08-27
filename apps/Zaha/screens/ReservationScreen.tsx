@@ -9,8 +9,9 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import DateTimePicker, { type DateTimePickerEvent } from '@react-native-community/datetimepicker';
 import { supabase } from '../lib/supabase';
-import { api, type Reservation } from '../lib/api';
+import { api } from '../lib/api';
 
 const DEMO_USER_ID = 'a1000000-0000-0000-0000-000000000001';
 
@@ -34,15 +35,33 @@ const RESERVATION_TYPES = [
 ] as const;
 
 const ROOM_TYPES = ['Simple', 'Double', 'Suite', 'Familiale'];
-
 const ACTIVITY_SLOTS = ['Matin', 'Après-midi', 'Journée complète'];
+
+const formatDate = (d: Date) =>
+  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+
+const formatTime = (d: Date) =>
+  `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+
+const today = new Date();
 
 export default function ReservationScreen({ place, onDone }: ReservationScreenProps) {
   const [currentUserId, setCurrentUserId] = useState<string>(DEMO_USER_ID);
   const [reservationType, setReservationType] = useState<string>('general');
-  const [date, setDate] = useState('');
-  const [timeStart, setTimeStart] = useState('');
-  const [timeEnd, setTimeEnd] = useState('');
+
+  const [dateObj, setDateObj] = useState<Date>(today);
+  const [showDatePicker, setShowDatePicker] = useState(false);
+
+  const [timeStartObj, setTimeStartObj] = useState<Date>(() => {
+    const d = new Date(); d.setHours(19, 0, 0, 0); return d;
+  });
+  const [showTimeStart, setShowTimeStart] = useState(false);
+
+  const [timeEndObj, setTimeEndObj] = useState<Date>(() => {
+    const d = new Date(); d.setHours(21, 0, 0, 0); return d;
+  });
+  const [showTimeEnd, setShowTimeEnd] = useState(false);
+
   const [guests, setGuests] = useState('1');
   const [roomType, setRoomType] = useState('');
   const [activitySlot, setActivitySlot] = useState('');
@@ -50,7 +69,6 @@ export default function ReservationScreen({ place, onDone }: ReservationScreenPr
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Résoudre userId au montage
   useState(() => {
     const resolve = async () => {
       try {
@@ -65,17 +83,22 @@ export default function ReservationScreen({ place, onDone }: ReservationScreenPr
     resolve();
   });
 
-  const handleSubmit = async () => {
-    if (!date.trim()) {
-      setError('La date est requise.');
-      return;
-    }
-    // Validation basique du format date (AAAA-MM-JJ)
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(date.trim())) {
-      setError('Format de date invalide. Utilisez AAAA-MM-JJ (ex: 2026-03-15).');
-      return;
-    }
+  const onDateChange = (_event: DateTimePickerEvent, selected?: Date) => {
+    setShowDatePicker(Platform.OS === 'ios');
+    if (selected) setDateObj(selected);
+  };
 
+  const onTimeStartChange = (_event: DateTimePickerEvent, selected?: Date) => {
+    setShowTimeStart(Platform.OS === 'ios');
+    if (selected) setTimeStartObj(selected);
+  };
+
+  const onTimeEndChange = (_event: DateTimePickerEvent, selected?: Date) => {
+    setShowTimeEnd(Platform.OS === 'ios');
+    if (selected) setTimeEndObj(selected);
+  };
+
+  const handleSubmit = async () => {
     setLoading(true);
     setError(null);
     try {
@@ -83,9 +106,9 @@ export default function ReservationScreen({ place, onDone }: ReservationScreenPr
         userId: currentUserId,
         placeId: place.id,
         reservationType,
-        date: date.trim(),
-        timeStart: timeStart.trim() || undefined,
-        timeEnd: timeEnd.trim() || undefined,
+        date: formatDate(dateObj),
+        timeStart: formatTime(timeStartObj),
+        timeEnd: formatTime(timeEndObj),
         guests: parseInt(guests, 10) || 1,
         roomType: reservationType === 'hotel' ? roomType || undefined : undefined,
         activitySlot: reservationType === 'activity' ? activitySlot || undefined : undefined,
@@ -126,36 +149,50 @@ export default function ReservationScreen({ place, onDone }: ReservationScreenPr
 
       {/* Date */}
       <Text style={styles.label}>Date *</Text>
-      <TextInput
-        style={styles.input}
-        value={date}
-        onChangeText={setDate}
-        placeholder="AAAA-MM-JJ (ex: 2026-03-15)"
-        keyboardType={Platform.OS === 'ios' ? 'numbers-and-punctuation' : 'default'}
-        maxLength={10}
-      />
+      <TouchableOpacity style={styles.input} onPress={() => setShowDatePicker(true)} accessibilityRole="button" accessibilityLabel="Choisir la date">
+        <Text style={styles.dateText}>📅 {formatDate(dateObj)}</Text>
+      </TouchableOpacity>
+      {showDatePicker && (
+        <DateTimePicker
+          value={dateObj}
+          mode="date"
+          display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+          onChange={onDateChange}
+          minimumDate={today}
+        />
+      )}
 
       {/* Horaires */}
       <View style={styles.row}>
         <View style={styles.halfField}>
           <Text style={styles.label}>Heure début</Text>
-          <TextInput
-            style={styles.input}
-            value={timeStart}
-            onChangeText={setTimeStart}
-            placeholder="HH:MM (ex: 19:00)"
-            maxLength={5}
-          />
+          <TouchableOpacity style={styles.input} onPress={() => setShowTimeStart(true)} accessibilityRole="button" accessibilityLabel="Choisir l'heure de début">
+            <Text style={styles.dateText}>🕐 {formatTime(timeStartObj)}</Text>
+          </TouchableOpacity>
+          {showTimeStart && (
+            <DateTimePicker
+              value={timeStartObj}
+              mode="time"
+              is24Hour
+              display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+              onChange={onTimeStartChange}
+            />
+          )}
         </View>
         <View style={styles.halfField}>
           <Text style={styles.label}>Heure fin</Text>
-          <TextInput
-            style={styles.input}
-            value={timeEnd}
-            onChangeText={setTimeEnd}
-            placeholder="HH:MM (ex: 21:00)"
-            maxLength={5}
-          />
+          <TouchableOpacity style={styles.input} onPress={() => setShowTimeEnd(true)} accessibilityRole="button" accessibilityLabel="Choisir l'heure de fin">
+            <Text style={styles.dateText}>🕐 {formatTime(timeEndObj)}</Text>
+          </TouchableOpacity>
+          {showTimeEnd && (
+            <DateTimePicker
+              value={timeEndObj}
+              mode="time"
+              is24Hour
+              display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+              onChange={onTimeEndChange}
+            />
+          )}
         </View>
       </View>
 
@@ -263,6 +300,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     fontSize: 15,
   },
+  dateText: { fontSize: 15, color: '#111827' },
   inputMultiline: { minHeight: 72, textAlignVertical: 'top' },
   row: { flexDirection: 'row', gap: 12 },
   halfField: { flex: 1 },
