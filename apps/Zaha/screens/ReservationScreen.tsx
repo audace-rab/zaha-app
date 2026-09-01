@@ -37,8 +37,11 @@ const RESERVATION_TYPES = [
 const ROOM_TYPES = ['Simple', 'Double', 'Suite', 'Familiale'];
 const ACTIVITY_SLOTS = ['Matin', 'Après-midi', 'Journée complète'];
 
-const formatDate = (d: Date) =>
+const formatDateISO = (d: Date) =>
   `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+
+const formatDateDisplay = (d: Date) =>
+  `${String(d.getDate()).padStart(2, '0')}-${String(d.getMonth() + 1).padStart(2, '0')}-${d.getFullYear()}`;
 
 const formatTime = (d: Date) =>
   `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
@@ -106,7 +109,7 @@ export default function ReservationScreen({ place, onDone }: ReservationScreenPr
         userId: currentUserId,
         placeId: place.id,
         reservationType,
-        date: formatDate(dateObj),
+        date: formatDateISO(dateObj),
         timeStart: formatTime(timeStartObj),
         timeEnd: formatTime(timeEndObj),
         guests: parseInt(guests, 10) || 1,
@@ -150,7 +153,7 @@ export default function ReservationScreen({ place, onDone }: ReservationScreenPr
       {/* Date */}
       <Text style={styles.label}>Date *</Text>
       <TouchableOpacity style={styles.input} onPress={() => setShowDatePicker(true)} accessibilityRole="button" accessibilityLabel="Choisir la date">
-        <Text style={styles.dateText}>📅 {formatDate(dateObj)}</Text>
+        <Text style={styles.dateText}>📅 {formatDateDisplay(dateObj)}</Text>
       </TouchableOpacity>
       {showDatePicker && (
         <DateTimePicker

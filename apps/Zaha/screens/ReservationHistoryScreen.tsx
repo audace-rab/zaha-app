@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
+  BackHandler,
   FlatList,
   RefreshControl,
   StyleSheet,
@@ -30,7 +31,11 @@ const STATUS_FILTERS: { key: StatusFilter; label: string }[] = [
   { key: 'cancelled', label: 'Annulées' },
 ];
 
-export default function ReservationHistoryScreen() {
+type ReservationHistoryScreenProps = {
+  onBack?: () => void;
+};
+
+export default function ReservationHistoryScreen({ onBack }: ReservationHistoryScreenProps) {
   const [reservations, setReservations] = useState<Reservation[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -52,6 +57,16 @@ export default function ReservationHistoryScreen() {
     };
     resolve();
   }, []);
+
+  // Intercepter le bouton retour Android pour revenir à Profil
+  useEffect(() => {
+    if (!onBack) return;
+    const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
+      onBack();
+      return true;
+    });
+    return () => subscription.remove();
+  }, [onBack]);
 
   const load = useCallback(
     (statusOverride?: StatusFilter) => {
