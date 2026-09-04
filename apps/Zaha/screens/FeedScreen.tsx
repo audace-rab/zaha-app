@@ -437,8 +437,10 @@ function PostCard({
           <Text style={styles.likeIcon}>{item.hasLiked ? '\u2764\uFE0F' : '\uD83E\uDD0D'}</Text>
           <Text style={[styles.likeCount, item.hasLiked && styles.likeCountActive]}>{item.likes}</Text>
         </TouchableOpacity>
-        <Text style={styles.commentCountIcon}>💬</Text>
-        <Text style={styles.commentCount}>{comments.length}</Text>
+        <View style={styles.commentButton}>
+          <Text style={styles.commentCountIcon}>💬</Text>
+          <Text style={styles.commentCount}>{comments.length}</Text>
+        </View>
       </View>
 
       {/* Commentaires */}
@@ -595,12 +597,13 @@ const styles = StyleSheet.create({
 
   // Content
   content: { padding: 12, fontSize: 15, lineHeight: 22 },
-  metaRow: { paddingHorizontal: 12, paddingBottom: 12 },
-  likeButton: { flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-start' },
+  metaRow: { flexDirection: 'row', alignItems: 'center', gap: 16, paddingHorizontal: 12, paddingBottom: 12 },
+  likeButton: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   likeIcon: { fontSize: 18 },
   likeCount: { color: '#6b7280', fontSize: 14, fontWeight: '600' },
   likeCountActive: { color: '#ef4444' },
-  commentCountIcon: { fontSize: 16, marginLeft: 12 },
+  commentButton: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  commentCountIcon: { fontSize: 16 },
   commentCount: { color: '#6b7280', fontSize: 14, fontWeight: '600' },
 
   // Comments
