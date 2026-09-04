@@ -15,7 +15,7 @@ import {
   View,
 } from 'react-native';
 import { launchImageLibrary } from 'react-native-image-picker';
-import { api } from '../lib/api';
+import { api, type Comment } from '../lib/api';
 import { supabase } from '../lib/supabase';
 
 const DEMO_USER_ID = 'a1000000-0000-0000-0000-000000000001';
@@ -49,12 +49,12 @@ export default function FeedScreen({ query, onClearSearch }: FeedScreenProps) {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [currentUserId, setCurrentUserId] = useState<string>(DEMO_USER_ID);
-  const [feedMode, setFeedMode] = useState<'personal' | 'all'>('all');
+
 
   // Create post
   const [createVisible, setCreateVisible] = useState(false);
   const [postContent, setPostContent] = useState('');
-  const [postPhotos, setPostPhotos] = useState<string[]>([]);
+  const [postPhotos, setPostPhotos] = useState<{ uri: string; type: 'image' | 'video' }[]>([]);
   const [creatingPost, setCreatingPost] = useState(false);
   const [keyboardHeight, setKeyboardHeight] = useState(0);
 
@@ -86,16 +86,12 @@ export default function FeedScreen({ query, onClearSearch }: FeedScreenProps) {
     (q?: string) => {
       setLoading(true);
       setError(null);
-      const fetcher =
-        feedMode === 'personal'
-          ? api.getFeed(undefined, undefined, currentUserId)
-          : api.getFeed(undefined, q, currentUserId);
-      return fetcher
+      return api.getFeed(undefined, q, currentUserId)
         .then(({ feed: items }) => setFeed(items))
         .catch((e: Error) => setError(e.message))
         .finally(() => setLoading(false));
     },
-    [currentUserId, feedMode]
+    [currentUserId]
   );
 
   useEffect(() => {
@@ -157,9 +153,18 @@ export default function FeedScreen({ query, onClearSearch }: FeedScreenProps) {
 
   // Create post
   const pickPhotos = () => {
-    launchImageLibrary({ mediaType: 'photo', selectionLimit: 5 }, (res) => {
+    launchImageLibrary({ mediaType: 'mixed', selectionLimit: 5 }, (res) => {
       if (res.assets && res.assets.length > 0) {
-        setPostPhotos((prev) => [...prev, ...res.assets!.map((a) => a.uri!).filter(Boolean)]);
+        setPostPhotos((prev) => [
+          ...prev,
+          ...res.assets!
+            .map((a) => {
+              if (!a.uri) return null;
+              const isVideo = a.type?.startsWith('video') || /\.(mp4|mov|avi|mkv|webm)$/i.test(a.uri);
+              return { uri: a.uri, type: (isVideo ? 'video' : 'image') as 'image' | 'video' };
+            })
+            .filter(Boolean) as { uri: string; type: 'image' | 'video' }[],
+        ]);
       }
     });
   };
@@ -173,9 +178,9 @@ export default function FeedScreen({ query, onClearSearch }: FeedScreenProps) {
     setCreatingPost(true);
     try {
       const media: { url: string; type: string }[] = [];
-      for (const uri of postPhotos) {
-        const { url } = await api.uploadPostMedia(currentUserId, uri);
-        media.push({ url, type: 'image' });
+      for (const item of postPhotos) {
+        const { url } = await api.uploadPostMedia(currentUserId, item.uri);
+        media.push({ url, type: item.type });
       }
       await api.createPost(currentUserId, postContent.trim(), undefined, media.length > 0 ? media : undefined);
       setPostContent('');
@@ -209,43 +214,20 @@ export default function FeedScreen({ query, onClearSearch }: FeedScreenProps) {
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={['#2563eb']} tintColor="#2563eb" />
         }
-        ListHeaderComponent={
-          <View style={styles.feedToggle}>
-            <TouchableOpacity
-              style={[styles.toggleBtn, feedMode === 'all' && styles.toggleBtnActive]}
-              onPress={() => setFeedMode('all')}
-              accessibilityRole="button"
-              accessibilityLabel="Voir tout le feed"
-              accessibilityState={{ selected: feedMode === 'all' }}
-            >
-              <Text style={[styles.toggleText, feedMode === 'all' && styles.toggleTextActive]}>Tout voir</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.toggleBtn, feedMode === 'personal' && styles.toggleBtnActive]}
-              onPress={() => setFeedMode('personal')}
-              accessibilityRole="button"
-              accessibilityLabel="Voir le feed personnalisé"
-              accessibilityState={{ selected: feedMode === 'personal' }}
-            >
-              <Text style={[styles.toggleText, feedMode === 'personal' && styles.toggleTextActive]}>Feed perso</Text>
-            </TouchableOpacity>
-          </View>
-        }
+
         ListEmptyComponent={
           loading ? (
             <FeedSkeleton />
           ) : (
             <View style={styles.emptyState}>
-              <Text style={styles.emptyIcon}>{hasFilter ? '🔍' : feedMode === 'personal' ? '👤' : '📡'}</Text>
+              <Text style={styles.emptyIcon}>{hasFilter ? '🔍' : '📡'}</Text>
               <Text style={styles.emptyTitle}>
-                {hasFilter ? 'Aucun résultat' : feedMode === 'personal' ? 'Rien à voir ici' : 'Feed indisponible'}
+                {hasFilter ? 'Aucun résultat' : 'Feed indisponible'}
               </Text>
               <Text style={styles.emptyMessage}>
                 {hasFilter
                   ? 'Aucune publication ne correspond à votre recherche.'
-                  : feedMode === 'personal'
-                    ? 'Suivez des utilisateurs pour voir leurs publications ici.'
-                    : 'Impossible de charger le feed pour le moment.'}
+                  : 'Impossible de charger le feed pour le moment.'}
               </Text>
               {hasFilter ? (
                 <TouchableOpacity style={styles.emptyButton} onPress={() => onClearSearch?.()} accessibilityRole="button" accessibilityLabel="Réinitialiser les filtres">
@@ -260,51 +242,13 @@ export default function FeedScreen({ query, onClearSearch }: FeedScreenProps) {
           )
         }
         renderItem={({ item }) => (
-          <View style={styles.card}>
-            <View style={styles.header}>
-              <Image source={{ uri: item.authorAvatar }} style={styles.avatar} />
-              <View style={styles.headerText}>
-                <Text style={styles.author}>
-                  {item.authorCountryFlag ? `${item.authorCountryFlag} ` : ''}
-                  {item.author}
-                </Text>
-                <Text style={styles.location}>{item.location}</Text>
-              </View>
-              {item.authorId && item.authorId !== currentUserId && (
-                <TouchableOpacity
-                  style={[styles.followBtn, item.isFollowing && styles.followBtnActive]}
-                  onPress={() => handleToggleFollow(item.authorId)}
-                  accessibilityRole="button"
-                  accessibilityLabel={item.isFollowing ? `Ne plus suivre ${item.author}` : `Suivre ${item.author}`}
-                >
-                  <Text style={[styles.followText, item.isFollowing && styles.followTextActive]}>
-                    {item.isFollowing ? 'Suivi' : 'Suivre'}
-                  </Text>
-                </TouchableOpacity>
-              )}
-            </View>
-
-            {item.media.length > 1 ? (
-              <PostCarousel media={item.media} />
-            ) : item.media[0] ? (
-              <Image source={{ uri: item.media[0].url }} style={styles.media} />
-            ) : null}
-
-            <Text style={styles.content}>{item.content}</Text>
-            <View style={styles.metaRow}>
-              <TouchableOpacity
-                style={styles.likeButton}
-                onPress={() => handleToggleLike(item.id)}
-                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                accessibilityRole="button"
-                accessibilityLabel={item.hasLiked ? 'Retirer le j\u2019aime' : 'Aimer cette publication'}
-                accessibilityState={{ selected: Boolean(item.hasLiked) }}
-              >
-                <Text style={styles.likeIcon}>{item.hasLiked ? '\u2764\uFE0F' : '\uD83E\uDD0D'}</Text>
-                <Text style={[styles.likeCount, item.hasLiked && styles.likeCountActive]}>{item.likes}</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
+          <PostCard
+            item={item}
+            currentUserId={currentUserId}
+            onToggleLike={handleToggleLike}
+            onToggleFollow={handleToggleFollow}
+            onRefreshFeed={() => load(query)}
+          />
         )}
       />
 
@@ -338,10 +282,15 @@ export default function FeedScreen({ query, onClearSearch }: FeedScreenProps) {
             />
             {postPhotos.length > 0 && (
               <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.modalPhotos}>
-                {postPhotos.map((uri, i) => (
+                {postPhotos.map((item, i) => (
                   <View key={i} style={styles.modalPhotoWrap}>
-                    <Image source={{ uri }} style={styles.modalPhoto} />
-                    <TouchableOpacity style={styles.modalPhotoRemove} onPress={() => removePhoto(i)} accessibilityRole="button" accessibilityLabel="Retirer la photo">
+                    <Image source={{ uri: item.uri }} style={styles.modalPhoto} />
+                    {item.type === 'video' && (
+                      <View style={styles.videoOverlay}>
+                        <Text style={styles.videoIcon}>▶</Text>
+                      </View>
+                    )}
+                    <TouchableOpacity style={styles.modalPhotoRemove} onPress={() => removePhoto(i)} accessibilityRole="button" accessibilityLabel="Retirer le média">
                       <Text style={styles.modalPhotoRemoveText}>✕</Text>
                     </TouchableOpacity>
                   </View>
@@ -350,7 +299,7 @@ export default function FeedScreen({ query, onClearSearch }: FeedScreenProps) {
             )}
             <View style={styles.modalActions}>
               <TouchableOpacity style={styles.modalAddPhoto} onPress={pickPhotos} accessibilityRole="button" accessibilityLabel="Ajouter des photos">
-                <Text style={styles.modalAddPhotoText}>📷 Photos</Text>
+                <Text style={styles.modalAddPhotoText}>📷 Photos / Vidéos</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={[styles.modalSubmit, (!postContent.trim() && postPhotos.length === 0) && styles.modalSubmitDisabled]}
@@ -365,6 +314,186 @@ export default function FeedScreen({ query, onClearSearch }: FeedScreenProps) {
           </View>
         </View>
       </Modal>
+    </View>
+  );
+}
+
+function PostCard({
+  item,
+  currentUserId,
+  onToggleLike,
+  onToggleFollow,
+  onRefreshFeed,
+}: {
+  item: FeedItem;
+  currentUserId: string;
+  onToggleLike: (postId: string) => void;
+  onToggleFollow: (userId: string) => void;
+  onRefreshFeed: () => void;
+}) {
+  const [showAllComments, setShowAllComments] = useState(false);
+  const [commentDraft, setCommentDraft] = useState('');
+  const [sendingComment, setSendingComment] = useState(false);
+  const [comments, setComments] = useState<Comment[]>(item.commentsList ?? []);
+
+  const refreshComments = async () => {
+    try {
+      const { comments: list } = await api.getComments(item.id);
+      setComments(list);
+    } catch (e) {
+      console.warn('Erreur chargement commentaires :', e);
+    }
+  };
+
+  const handleAddComment = async () => {
+    const text = commentDraft.trim();
+    if (!text || sendingComment) return;
+    setSendingComment(true);
+    const optimistic: Comment = {
+      id: `temp-${Date.now()}`,
+      post_id: item.id,
+      author_id: currentUserId,
+      text,
+      created_at: new Date().toISOString(),
+      author: { name: 'Moi' },
+    };
+    setComments((prev) => [...prev, optimistic]);
+    setCommentDraft('');
+    try {
+      const { comment } = await api.addComment(item.id, currentUserId, text);
+      setComments((prev) => prev.map((c) => (c.id === optimistic.id ? comment : c)));
+    } catch (e) {
+      console.warn('Erreur ajout commentaire :', e);
+      setComments((prev) => prev.filter((c) => c.id !== optimistic.id));
+      setCommentDraft(text);
+    } finally {
+      setSendingComment(false);
+      onRefreshFeed();
+    }
+  };
+
+  const handleDeleteComment = async (comment: Comment) => {
+    if (comment.author_id !== currentUserId) return;
+    setComments((prev) => prev.filter((c) => c.id !== comment.id));
+    try {
+      await api.deleteComment(item.id, comment.id, currentUserId);
+    } catch (e) {
+      console.warn('Erreur suppression commentaire :', e);
+    }
+  };
+
+  const visibleComments = showAllComments ? comments : comments.slice(0, 3);
+  const hiddenCount = comments.length - visibleComments.length;
+
+  return (
+    <View style={styles.card}>
+      <View style={styles.header}>
+        <Image source={{ uri: item.authorAvatar }} style={styles.avatar} />
+        <View style={styles.headerText}>
+          <Text style={styles.author}>
+            {item.authorCountryFlag ? `${item.authorCountryFlag} ` : ''}
+            {item.author}
+          </Text>
+          <Text style={styles.location}>{item.location}</Text>
+        </View>
+        {item.authorId && item.authorId !== currentUserId && (
+          <TouchableOpacity
+            style={[styles.followBtn, item.isFollowing && styles.followBtnActive]}
+            onPress={() => onToggleFollow(item.authorId)}
+            accessibilityRole="button"
+            accessibilityLabel={item.isFollowing ? `Ne plus suivre ${item.author}` : `Suivre ${item.author}`}
+          >
+            <Text style={[styles.followText, item.isFollowing && styles.followTextActive]}>
+              {item.isFollowing ? 'Suivi' : 'Suivre'}
+            </Text>
+          </TouchableOpacity>
+        )}
+      </View>
+
+      {item.media.length > 1 ? (
+        <PostCarousel media={item.media} />
+      ) : item.media[0] ? (
+        <View style={styles.singleMediaWrap}>
+          <Image source={{ uri: item.media[0].url }} style={styles.media} />
+          {item.media[0].type === 'video' && (
+            <View style={styles.singleVideoOverlay}>
+              <Text style={styles.singleVideoIcon}>▶</Text>
+            </View>
+          )}
+        </View>
+      ) : null}
+
+      <Text style={styles.content}>{item.content}</Text>
+      <View style={styles.metaRow}>
+        <TouchableOpacity
+          style={styles.likeButton}
+          onPress={() => onToggleLike(item.id)}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          accessibilityRole="button"
+          accessibilityLabel={item.hasLiked ? 'Retirer le j\u2019aime' : 'Aimer cette publication'}
+          accessibilityState={{ selected: Boolean(item.hasLiked) }}
+        >
+          <Text style={styles.likeIcon}>{item.hasLiked ? '\u2764\uFE0F' : '\uD83E\uDD0D'}</Text>
+          <Text style={[styles.likeCount, item.hasLiked && styles.likeCountActive]}>{item.likes}</Text>
+        </TouchableOpacity>
+        <Text style={styles.commentCountIcon}>💬</Text>
+        <Text style={styles.commentCount}>{comments.length}</Text>
+      </View>
+
+      {/* Commentaires */}
+      {visibleComments.length > 0 && (
+        <View style={styles.commentsSection}>
+          {visibleComments.map((c) => {
+            const isMine = c.author_id === currentUserId;
+            return (
+              <TouchableOpacity
+                key={c.id}
+                style={styles.commentRow}
+                onLongPress={() => isMine && handleDeleteComment(c)}
+                delayLongPress={400}
+                accessibilityRole="button"
+                accessibilityLabel={isMine ? 'Commentaire, appui long pour supprimer' : `Commentaire de ${c.author?.name ?? ''}`}
+                disabled={!isMine}
+              >
+                <View style={styles.commentBubble}>
+                  <Text style={styles.commentAuthor}>
+                    {c.author?.name ?? c.author_name ?? 'Anonyme'}
+                    {isMine ? ' · toi' : ''}
+                  </Text>
+                  <Text style={styles.commentText}>{c.text}</Text>
+                </View>
+              </TouchableOpacity>
+            );
+          })}
+          {hiddenCount > 0 && (
+            <TouchableOpacity onPress={() => setShowAllComments(true)} accessibilityRole="button" accessibilityLabel={`Voir les ${hiddenCount} autres commentaires`}>
+              <Text style={styles.viewAllText}>
+                Voir les {hiddenCount} autre{hiddenCount > 1 ? 's' : ''} commentaire{hiddenCount > 1 ? 's' : ''}...
+              </Text>
+            </TouchableOpacity>
+          )}
+        </View>
+      )}
+
+      {/* Input commentaire */}
+      <View style={styles.commentInputRow}>
+        <TextInput
+          style={styles.commentInput}
+          value={commentDraft}
+          onChangeText={setCommentDraft}
+          placeholder="Écrire un commentaire..."
+          placeholderTextColor="#9ca3af"
+        />
+        <TouchableOpacity
+          style={[styles.commentSubmit, (!commentDraft.trim() || sendingComment) && styles.commentSubmitDisabled]}
+          onPress={handleAddComment}
+          disabled={!commentDraft.trim() || sendingComment}
+          accessibilityRole="button"
+          accessibilityLabel="Publier le commentaire"
+        >
+          {sendingComment ? <ActivityIndicator size="small" color="#fff" /> : <Text style={styles.commentSubmitText}>Publier</Text>}
+        </TouchableOpacity>
+      </View>
     </View>
   );
 }
@@ -384,7 +513,14 @@ function PostCarousel({ media }: { media: { type: string; url: string }[] }) {
           setActiveIndex(Math.min(idx, media.length - 1));
         }}
         renderItem={({ item }) => (
-          <Image source={{ uri: item.url }} style={[styles.media, { width: SCREEN_WIDTH }]} />
+          <View style={[styles.carouselSlide, { width: SCREEN_WIDTH }]}>
+            <Image source={{ uri: item.url }} style={[styles.media, { width: SCREEN_WIDTH }]} />
+            {item.type === 'video' && (
+              <View style={styles.carouselVideoOverlay}>
+                <Text style={styles.carouselVideoIcon}>▶</Text>
+              </View>
+            )}
+          </View>
         )}
       />
       {media.length > 1 && (
@@ -422,20 +558,7 @@ const styles = StyleSheet.create({
   center: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24 },
   list: { padding: 16, gap: 16, paddingBottom: 80 },
 
-  // Feed toggle
-  feedToggle: { flexDirection: 'row', gap: 8, marginBottom: 4 },
-  toggleBtn: {
-    flex: 1,
-    paddingVertical: 10,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#d1d5db',
-    backgroundColor: '#fff',
-    alignItems: 'center',
-  },
-  toggleBtnActive: { backgroundColor: '#2563eb', borderColor: '#2563eb' },
-  toggleText: { fontSize: 14, color: '#374151', fontWeight: '500' },
-  toggleTextActive: { color: '#fff', fontWeight: '700' },
+
 
   // Card
   card: { backgroundColor: '#fff', borderRadius: 16, overflow: 'hidden', marginBottom: 16, borderWidth: 1, borderColor: '#e5e7eb' },
@@ -453,6 +576,18 @@ const styles = StyleSheet.create({
 
   // Media
   media: { width: '100%', height: 220 },
+  carouselSlide: { position: 'relative' },
+  carouselVideoOverlay: {
+    position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.3)', alignItems: 'center', justifyContent: 'center',
+  },
+  carouselVideoIcon: { color: '#fff', fontSize: 40 },
+  singleMediaWrap: { position: 'relative' },
+  singleVideoOverlay: {
+    position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.3)', alignItems: 'center', justifyContent: 'center',
+  },
+  singleVideoIcon: { color: '#fff', fontSize: 40 },
   dots: { position: 'absolute', left: 0, right: 0, bottom: 10, flexDirection: 'row', justifyContent: 'center', gap: 6 },
   dot: { width: 7, height: 7, borderRadius: 4, backgroundColor: 'rgba(255,255,255,0.5)' },
   dotActive: { backgroundColor: '#fff' },
@@ -464,6 +599,52 @@ const styles = StyleSheet.create({
   likeIcon: { fontSize: 18 },
   likeCount: { color: '#6b7280', fontSize: 14, fontWeight: '600' },
   likeCountActive: { color: '#ef4444' },
+  commentCountIcon: { fontSize: 16, marginLeft: 12 },
+  commentCount: { color: '#6b7280', fontSize: 14, fontWeight: '600' },
+
+  // Comments
+  commentsSection: { paddingHorizontal: 12, paddingBottom: 4, gap: 6 },
+  commentRow: { flexDirection: 'row' },
+  commentBubble: {
+    backgroundColor: '#f3f4f6',
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    maxWidth: '92%',
+  },
+  commentAuthor: { fontSize: 12, fontWeight: '700', color: '#374151', marginBottom: 2 },
+  commentText: { fontSize: 14, color: '#111827', lineHeight: 19 },
+  viewAllText: { color: '#2563eb', fontSize: 13, fontWeight: '600', paddingVertical: 6 },
+  commentInputRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderTopWidth: 1,
+    borderColor: '#f3f4f6',
+    padding: 10,
+    gap: 8,
+  },
+  commentInput: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: '#d1d5db',
+    borderRadius: 20,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    fontSize: 14,
+    backgroundColor: '#f8fafc',
+    color: '#111827',
+  },
+  commentSubmit: {
+    backgroundColor: '#2563eb',
+    borderRadius: 20,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    justifyContent: 'center',
+    minWidth: 64,
+    alignItems: 'center',
+  },
+  commentSubmitDisabled: { opacity: 0.5 },
+  commentSubmitText: { color: '#fff', fontWeight: '600', fontSize: 14 },
 
   // Error / empty
   error: { color: '#dc2626', textAlign: 'center', marginBottom: 8 },
@@ -499,6 +680,11 @@ const styles = StyleSheet.create({
   modalPhoto: { width: 80, height: 80, borderRadius: 10 },
   modalPhotoRemove: { position: 'absolute', top: -6, right: -6, width: 22, height: 22, borderRadius: 11, backgroundColor: '#dc2626', alignItems: 'center', justifyContent: 'center' },
   modalPhotoRemoveText: { color: '#fff', fontSize: 12, fontWeight: '700' },
+  videoOverlay: {
+    position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.3)', alignItems: 'center', justifyContent: 'center',
+  },
+  videoIcon: { color: '#fff', fontSize: 24 },
   modalActions: { flexDirection: 'row', gap: 10 },
   modalAddPhoto: { flex: 1, paddingVertical: 12, borderRadius: 12, borderWidth: 1, borderColor: '#d1d5db', alignItems: 'center' },
   modalAddPhotoText: { fontSize: 14, color: '#374151', fontWeight: '600' },

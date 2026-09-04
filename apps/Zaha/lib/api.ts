@@ -28,6 +28,16 @@ type FeedItem = {
   isFollowing?: boolean;
 };
 
+export type Comment = {
+  id: string;
+  post_id: string;
+  author_id: string;
+  text: string;
+  created_at: string;
+  author_name?: string;
+  author?: { name: string; avatar_url?: string };
+};
+
 type BookmarkResponse = {
   bookmarked: boolean;
 };
@@ -213,6 +223,21 @@ export const api = {
       body: JSON.stringify({ userId }),
     }),
 
+  getComments: (postId: string) =>
+    apiFetch<{ comments: Comment[] }>(`/api/posts/${postId}/comments`),
+
+  addComment: (postId: string, authorId: string, text: string) =>
+    apiFetch<{ comment: Comment }>(`/api/posts/${postId}/comments`, {
+      method: 'POST',
+      body: JSON.stringify({ authorId, text }),
+    }),
+
+  deleteComment: (postId: string, commentId: string, authorId: string) =>
+    apiFetch<{ success: boolean }>(`/api/posts/${postId}/comments/${commentId}`, {
+      method: 'DELETE',
+      body: JSON.stringify({ authorId }),
+    }),
+
   searchPlaces: (body: PlacesSearchRequest) =>
     apiFetch<PlacesSearchResponse>('/api/places/search', {
       method: 'POST',
@@ -316,12 +341,22 @@ export const api = {
     }),
 
   uploadPostMedia: (userId: string, fileUri: string) => {
+    const ext = fileUri.split('.').pop()?.toLowerCase() ?? '';
+    const mimeMap: Record<string, string> = {
+      mp4: 'video/mp4', mov: 'video/quicktime', avi: 'video/x-msvideo',
+      mkv: 'video/x-matroska', webm: 'video/webm',
+      jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png',
+      gif: 'image/gif', webp: 'image/webp',
+    };
+    const isVideo = ['mp4', 'mov', 'avi', 'mkv', 'webm'].includes(ext);
+    const mime = mimeMap[ext] ?? (isVideo ? 'video/mp4' : 'image/jpeg');
+    const fileName = isVideo ? `video.${ext || 'mp4'}` : `photo.${ext || 'jpg'}`;
     const formData = new FormData();
     formData.append('userId', userId);
     formData.append('file', {
       uri: fileUri,
-      name: 'photo.jpg',
-      type: 'image/jpeg',
+      name: fileName,
+      type: mime,
     } as unknown as Blob);
     return apiUpload<{ url: string }>('/api/posts/media', formData);
   },
