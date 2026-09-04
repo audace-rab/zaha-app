@@ -594,6 +594,7 @@ const styles = StyleSheet.create({
   bookmarkButtonTextActive: { color: '#ef4444' },
   actionsRow: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     gap: 8,
     marginTop: 12,
   },
@@ -660,11 +661,12 @@ const styles = StyleSheet.create({
   reviewCommentInput: {
     borderWidth: 1,
     borderColor: '#d1d5db',
-    borderRadius: 8,
+    borderRadius: 12,
     padding: 10,
     fontSize: 14,
     color: '#111827',
     minHeight: 72,
+    backgroundColor: '#f8fafc',
   },
   reviewFormError: { color: '#dc2626', fontSize: 13 },
   reviewFormActions: { flexDirection: 'row', gap: 8 },

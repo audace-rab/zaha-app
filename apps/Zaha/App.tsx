@@ -187,7 +187,7 @@ function AppInner() {
             { id: 'chat', label: 'Zaha AI' },
             { id: 'profile', label: 'Profil' },
           ] as const
-        ).map((item) => (
+        )        .map((item) => (
           <TouchableOpacity
             key={item.id}
             style={[styles.tab, tab === item.id && styles.tabActive]}
@@ -196,6 +196,9 @@ function AppInner() {
               if (item.id !== 'profile') setShowReservations(false);
             }}
           >
+            <Text style={[styles.tabIcon, tab === item.id && styles.tabIconActive]}>
+              {item.id === 'feed' ? '📰' : item.id === 'places' ? '📍' : item.id === 'chat' ? '💬' : '👤'}
+            </Text>
             <Text style={[styles.tabText, tab === item.id && styles.tabTextActive]}>
               {item.label}
             </Text>
@@ -217,6 +220,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderColor: '#e5e7eb',
     backgroundColor: '#fff',
+    gap: 2,
   },
   title: { fontSize: 22, fontWeight: '700', color: '#111827' },
   headerSearchField: {
@@ -231,8 +235,8 @@ const styles = StyleSheet.create({
   },
   headerSearchInput: { flex: 1, paddingVertical: 8, fontSize: 14 },
   headerSearchButton: {
-    paddingHorizontal: 12,
-    paddingVertical: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
   },
   headerSearchIcon: { fontSize: 15 },
   content: { flex: 1 },
@@ -251,8 +255,10 @@ const styles = StyleSheet.create({
     borderColor: '#e5e7eb',
     backgroundColor: '#fff',
   },
-  tab: { flex: 1, paddingVertical: 14, alignItems: 'center' },
+  tab: { flex: 1, paddingVertical: 10, alignItems: 'center', gap: 2 },
   tabActive: { borderTopWidth: 2, borderTopColor: '#2563eb' },
-  tabText: { color: '#6b7280', fontWeight: '500' },
+  tabIcon: { fontSize: 18, color: '#6b7280' },
+  tabIconActive: { color: '#2563eb' },
+  tabText: { color: '#6b7280', fontWeight: '500', fontSize: 11 },
   tabTextActive: { color: '#2563eb', fontWeight: '700' },
 });

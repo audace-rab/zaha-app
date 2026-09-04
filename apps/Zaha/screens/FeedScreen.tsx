@@ -572,7 +572,7 @@ const styles = StyleSheet.create({
   location: { color: '#6b7280', fontSize: 13 },
 
   // Follow
-  followBtn: { paddingHorizontal: 14, paddingVertical: 6, borderRadius: 20, borderWidth: 1, borderColor: '#2563eb' },
+  followBtn: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20, borderWidth: 1, borderColor: '#2563eb', minHeight: 36, justifyContent: 'center' },
   followBtnActive: { backgroundColor: '#2563eb' },
   followText: { fontSize: 13, color: '#2563eb', fontWeight: '600' },
   followTextActive: { color: '#fff' },
@@ -669,7 +669,7 @@ const styles = StyleSheet.create({
   skeletonMedia: { height: 180, borderRadius: 8 },
 
   // FAB
-  fab: { position: 'absolute', right: 20, bottom: 20, width: 56, height: 56, borderRadius: 28, backgroundColor: '#2563eb', alignItems: 'center', justifyContent: 'center', elevation: 6, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.25, shadowRadius: 4 },
+  fab: { position: 'absolute', right: 20, bottom: 20, width: 56, height: 56, borderRadius: 28, backgroundColor: '#2563eb', alignItems: 'center', justifyContent: 'center', elevation: 8, shadowColor: '#000', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.3, shadowRadius: 6 },
   fabText: { color: '#fff', fontSize: 28, lineHeight: 30, fontWeight: '300' },
 
   // Modal

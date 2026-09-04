@@ -290,7 +290,7 @@ export default function ReservationScreen({ place, onDone }: ReservationScreenPr
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#f9fafb' },
-  content: { padding: 16, paddingBottom: 40, gap: 4 },
+  content: { padding: 16, paddingBottom: 40, gap: 8 },
   placeName: { fontSize: 18, fontWeight: '700', color: '#111827', marginBottom: 2 },
   placeAddress: { color: '#6b7280', fontSize: 14, marginBottom: 12 },
   label: { fontSize: 14, fontWeight: '600', color: '#374151', marginTop: 12, marginBottom: 6 },
