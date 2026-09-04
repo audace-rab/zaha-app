@@ -20,6 +20,7 @@ import { supabase } from '../lib/supabase';
 
 const DEMO_USER_ID = 'a1000000-0000-0000-0000-000000000001';
 const SCREEN_WIDTH = Dimensions.get('window').width;
+const CARD_WIDTH = SCREEN_WIDTH - 32;
 
 type FeedItem = {
   id: string;
@@ -509,12 +510,12 @@ function PostCarousel({ media }: { media: { type: string; url: string }[] }) {
         showsHorizontalScrollIndicator={false}
         keyExtractor={(_, i) => `media-${i}`}
         onMomentumScrollEnd={(e) => {
-          const idx = Math.round(e.nativeEvent.contentOffset.x / SCREEN_WIDTH);
+          const idx = Math.round(e.nativeEvent.contentOffset.x / CARD_WIDTH);
           setActiveIndex(Math.min(idx, media.length - 1));
         }}
         renderItem={({ item }) => (
-          <View style={[styles.carouselSlide, { width: SCREEN_WIDTH }]}>
-            <Image source={{ uri: item.url }} style={[styles.media, { width: SCREEN_WIDTH }]} />
+          <View style={[styles.carouselSlide, { width: CARD_WIDTH }]}>
+            <Image source={{ uri: item.url }} style={[styles.media, { width: CARD_WIDTH }]} />
             {item.type === 'video' && (
               <View style={styles.carouselVideoOverlay}>
                 <Text style={styles.carouselVideoIcon}>▶</Text>
