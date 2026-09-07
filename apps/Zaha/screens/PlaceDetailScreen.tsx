@@ -371,7 +371,7 @@ export default function PlaceDetailScreen({ place }: PlaceDetailScreenProps) {
               adjustsFontSizeToFit
               minimumFontScale={0.8}
             >
-              📤 Partager
+              ✈️ Partager
             </Text>
           </TouchableOpacity>
         </View>
