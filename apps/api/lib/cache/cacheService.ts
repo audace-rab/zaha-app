@@ -38,6 +38,6 @@ export async function cacheSet<T>(key: string, data: T, ttlMinutes = 60): Promis
 }
 
 export const CACHE_KEYS = {
-  PLACES: 'zaha_places_v3_',
+  PLACES: 'zaha_places_v4_',
   TRANSLATIONS: 'zaha_translations',
 } as const;
