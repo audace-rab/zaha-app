@@ -319,41 +319,61 @@ export default function PlaceDetailScreen({ place }: PlaceDetailScreenProps) {
         <View style={styles.actionsRow}>
           {place.location && (
             <TouchableOpacity
-              style={[styles.actionButton, styles.mapsButton]}
+              style={[styles.actionButton, showMap && styles.mapButtonActive]}
               onPress={() => setShowMap((prev) => !prev)}
               accessibilityRole="button"
+              accessibilityState={{ selected: showMap }}
               accessibilityLabel={showMap ? 'Masquer la carte' : 'Voir sur la carte'}
             >
-              <Text style={styles.mapsButtonText}>
-                {showMap ? '🗺️ Masquer la carte' : '🗺️ Voir sur la carte'}
+              <Text
+                style={[styles.mapButtonText, showMap && styles.mapButtonTextActive]}
+                numberOfLines={1}
+                adjustsFontSizeToFit
+                minimumFontScale={0.8}
+              >
+                {showMap ? '🗺️ Masquer la carte' : '🗺️ Voir la carte'}
               </Text>
             </TouchableOpacity>
           )}
           <TouchableOpacity
-            style={[styles.actionButton, styles.bookmarkButton, bookmarked && styles.bookmarkButtonActive]}
+            style={[styles.actionButton, bookmarked && styles.bookmarkButtonActive]}
             onPress={handleToggleBookmark}
             accessibilityRole="button"
             accessibilityLabel={bookmarked ? 'Retirer des favoris' : 'Ajouter aux favoris'}
           >
-            <Text style={[styles.bookmarkButtonText, bookmarked && styles.bookmarkButtonTextActive]}>
+            <Text
+              style={[styles.bookmarkButtonText, bookmarked && styles.bookmarkButtonTextActive]}
+              numberOfLines={1}
+              adjustsFontSizeToFit
+              minimumFontScale={0.8}
+            >
               {bookmarked ? '❤️ Sauvegardé' : '♡ Sauvegarder'}
             </Text>
           </TouchableOpacity>
           <TouchableOpacity
-            style={[styles.actionButton, styles.shareButton]}
+            style={styles.actionButton}
             onPress={sharePlace}
-          >
-            <Text style={styles.shareButtonText}>Partager</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.actionButton, styles.reserveButton]}
-            onPress={() => setShowReservation(true)}
             accessibilityRole="button"
-            accessibilityLabel="Réserver ce lieu"
+            accessibilityLabel="Partager ce lieu"
           >
-            <Text style={styles.reserveButtonText}>📅 Réserver</Text>
+            <Text
+              style={styles.shareButtonText}
+              numberOfLines={1}
+              adjustsFontSizeToFit
+              minimumFontScale={0.8}
+            >
+              🔗 Partager
+            </Text>
           </TouchableOpacity>
         </View>
+        <TouchableOpacity
+          style={styles.reserveButton}
+          onPress={() => setShowReservation(true)}
+          accessibilityRole="button"
+          accessibilityLabel="Réserver ce lieu"
+        >
+          <Text style={styles.reserveButtonText}>📅 Réserver</Text>
+        </TouchableOpacity>
 
         {showMap && place.location && (
           <MapView
@@ -568,42 +588,47 @@ const styles = StyleSheet.create({
   line: { color: '#374151', fontSize: 15 },
   addressLink: { textDecorationLine: 'underline' },
   snippet: { color: '#6b7280', fontSize: 15, lineHeight: 22, marginTop: 4 },
-  mapsButton: {
-    backgroundColor: '#2563eb',
-  },
-  mapsButtonText: { color: '#fff', fontWeight: '600', fontSize: 15 },
-  shareButton: {
-    borderWidth: 1,
-    borderColor: '#2563eb',
-    backgroundColor: '#fff',
-  },
-  shareButtonText: { color: '#2563eb', fontWeight: '600', fontSize: 15 },
+  mapButtonText: { color: '#2563eb', fontWeight: '600', fontSize: 13 },
+  mapButtonTextActive: { color: '#2563eb', fontWeight: '700' },
+  shareButtonText: { color: '#374151', fontWeight: '600', fontSize: 13 },
   reserveButton: {
     backgroundColor: '#2563eb',
+    paddingVertical: 14,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 8,
   },
   reserveButtonText: { color: '#fff', fontWeight: '700', fontSize: 15 },
-  bookmarkButton: {
-    borderWidth: 1,
-    borderColor: '#d1d5db',
-    backgroundColor: '#fff',
-  },
   bookmarkButtonActive: {
     borderColor: '#ef4444',
     backgroundColor: '#fef2f2',
   },
-  bookmarkButtonText: { color: '#6b7280', fontWeight: '600', fontSize: 15 },
-  bookmarkButtonTextActive: { color: '#ef4444' },
+  bookmarkButtonText: { color: '#374151', fontWeight: '600', fontSize: 13 },
+  bookmarkButtonTextActive: { color: '#ef4444', fontWeight: '700' },
   actionsRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 8,
     marginTop: 12,
+    alignItems: 'stretch',
   },
   actionButton: {
-    flex: 1,
-    paddingVertical: 14,
+    flexGrow: 1,
+    flexBasis: 0,
+    minWidth: 96,
+    paddingVertical: 12,
+    paddingHorizontal: 10,
     borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+    backgroundColor: '#fff',
     alignItems: 'center',
+    justifyContent: 'center',
+  },
+  mapButtonActive: {
+    backgroundColor: '#eff6ff',
+    borderColor: '#2563eb',
   },
   dots: {
     position: 'absolute',
