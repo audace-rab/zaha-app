@@ -11,6 +11,7 @@ import {
   View,
 } from 'react-native';
 import { supabase } from '../lib/supabase';
+import FontIcon from '../components/FontIcon';
 
 interface AuthScreenProps {
   onAuthSuccess: () => void;
@@ -129,7 +130,12 @@ export default function AuthScreen({ onAuthSuccess }: AuthScreenProps) {
               accessibilityRole="button"
               accessibilityLabel={showPassword ? 'Masquer le mot de passe' : 'Afficher le mot de passe'}
             >
-              <Text style={styles.eyeIcon}>{showPassword ? '🙈' : '👁'}</Text>
+              <FontIcon
+                name={showPassword ? 'eye' : 'eye-slash'}
+                width={18}
+                height={18}
+                fill="#6b7280"
+              />
             </TouchableOpacity>
           </View>
 
@@ -174,10 +180,9 @@ const styles = StyleSheet.create({
   title: { fontSize: 24, fontWeight: '700', color: '#111827', marginBottom: 8 },
   subtitle: { color: '#6b7280', marginBottom: 24, lineHeight: 20 },
   input: { borderWidth: 1, borderColor: '#d1d5db', borderRadius: 14, padding: 14, marginBottom: 12, backgroundColor: '#f8fafc' },
-  passwordWrapper: { width: '100%' },
-  passwordInput: { marginBottom: 0, paddingRight: 48 },
+passwordWrapper: { width: '100%' },
+  passwordInput: { paddingRight: 48 },
   eyeButton: { position: 'absolute', right: 12, top: 0, bottom: 0, justifyContent: 'center' },
-  eyeIcon: { fontSize: 18 },
   button: { backgroundColor: '#2563eb', borderRadius: 14, paddingVertical: 14, alignItems: 'center', marginTop: 8 },
   buttonText: { color: '#fff', fontWeight: '700' },
   switchRow: { flexDirection: 'row', justifyContent: 'center', gap: 6, marginTop: 16 },

@@ -11,6 +11,7 @@ import {
   View,
 } from 'react-native';
 import { api } from '../lib/api';
+import FontIcon from '../components/FontIcon';
 
 type ChatMessage = {
   id: string;
@@ -122,9 +123,12 @@ export default function ChatScreen() {
                       Linking.openURL(source.uri).catch(() => {});
                     }}
                   >
-                    <Text numberOfLines={1} style={styles.sourceText}>
-                      🔗 {source.title || `Source ${index + 1}`}
-                    </Text>
+                    <View style={styles.sourceRow}>
+                      <FontIcon name="link" width={12} height={12} fill="#2563eb" />
+                      <Text numberOfLines={1} style={styles.sourceText}>
+                        {source.title || `Source ${index + 1}`}
+                      </Text>
+                    </View>
                   </TouchableOpacity>
                 ))}
               </View>
@@ -171,6 +175,7 @@ const styles = StyleSheet.create({
   modelText: { color: '#111827' },
   sources: { marginTop: 8, gap: 4 },
   sourceLink: { paddingVertical: 2 },
+  sourceRow: { flexDirection: 'row', alignItems: 'center', gap: 5 },
   sourceText: { color: '#2563eb', fontSize: 13 },
   typingBubble: {
     flexDirection: 'row',

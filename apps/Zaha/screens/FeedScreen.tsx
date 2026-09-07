@@ -17,6 +17,7 @@ import {
 import { launchImageLibrary } from 'react-native-image-picker';
 import { api, type Comment } from '../lib/api';
 import { supabase } from '../lib/supabase';
+import FontIcon from '../components/FontIcon';
 
 const DEMO_USER_ID = 'a1000000-0000-0000-0000-000000000001';
 const SCREEN_WIDTH = Dimensions.get('window').width;
@@ -221,7 +222,13 @@ export default function FeedScreen({ query, onClearSearch }: FeedScreenProps) {
             <FeedSkeleton />
           ) : (
             <View style={styles.emptyState}>
-              <Text style={styles.emptyIcon}>{hasFilter ? '🔍' : '📡'}</Text>
+              <View style={styles.emptyIcon}>
+                {hasFilter ? (
+                  <FontIcon name="magnifying-glass" width={44} height={44} fill="#9ca3af" />
+                ) : (
+                  <FontIcon name="satellite-dish" width={44} height={44} fill="#9ca3af" />
+                )}
+              </View>
               <Text style={styles.emptyTitle}>
                 {hasFilter ? 'Aucun résultat' : 'Feed indisponible'}
               </Text>
@@ -300,7 +307,10 @@ export default function FeedScreen({ query, onClearSearch }: FeedScreenProps) {
             )}
             <View style={styles.modalActions}>
               <TouchableOpacity style={styles.modalAddPhoto} onPress={pickPhotos} accessibilityRole="button" accessibilityLabel="Ajouter des photos">
-                <Text style={styles.modalAddPhotoText}>📷 Photos / Vidéos</Text>
+                <View style={styles.modalAddPhotoRow}>
+                  <FontIcon name="camera" width={16} height={16} fill="#374151" />
+                  <Text style={styles.modalAddPhotoText}>Photos / Vidéos</Text>
+                </View>
               </TouchableOpacity>
               <TouchableOpacity
                 style={[styles.modalSubmit, (!postContent.trim() && postPhotos.length === 0) && styles.modalSubmitDisabled]}
@@ -450,7 +460,12 @@ function PostCard({
           accessibilityLabel={commentsExpanded ? 'Masquer les commentaires' : 'Voir les commentaires'}
           accessibilityState={{ expanded: commentsExpanded }}
         >
-          <Text style={[styles.commentCountIcon, commentsExpanded && styles.commentCountIconActive]}>💬</Text>
+          <FontIcon
+            name="comment"
+            width={16}
+            height={16}
+            fill={commentsExpanded ? '#2563eb' : '#6b7280'}
+          />
           <Text style={styles.commentCount}>{comments.length}</Text>
         </TouchableOpacity>
       </View>
@@ -621,8 +636,6 @@ const styles = StyleSheet.create({
   likeCount: { color: '#6b7280', fontSize: 14, fontWeight: '600' },
   likeCountActive: { color: '#ef4444' },
   commentButton: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  commentCountIcon: { fontSize: 16 },
-  commentCountIconActive: { color: '#2563eb' },
   commentCount: { color: '#6b7280', fontSize: 14, fontWeight: '600' },
 
   // Comments
@@ -674,7 +687,7 @@ const styles = StyleSheet.create({
   error: { color: '#dc2626', textAlign: 'center', marginBottom: 8 },
   hint: { color: '#6b7280', textAlign: 'center' },
   emptyState: { alignItems: 'center', paddingVertical: 48, paddingHorizontal: 24 },
-  emptyIcon: { fontSize: 44, marginBottom: 12 },
+  emptyIcon: { alignItems: 'center', justifyContent: 'center', marginBottom: 12 },
   emptyTitle: { fontSize: 17, fontWeight: '700', color: '#111827', marginBottom: 6 },
   emptyMessage: { color: '#6b7280', textAlign: 'center', marginBottom: 16 },
   emptyButton: { backgroundColor: '#2563eb', borderRadius: 12, paddingHorizontal: 16, paddingVertical: 10 },
@@ -711,6 +724,7 @@ const styles = StyleSheet.create({
   videoIcon: { color: '#fff', fontSize: 24 },
   modalActions: { flexDirection: 'row', gap: 10 },
   modalAddPhoto: { flex: 1, paddingVertical: 12, borderRadius: 12, borderWidth: 1, borderColor: '#d1d5db', alignItems: 'center' },
+  modalAddPhotoRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   modalAddPhotoText: { fontSize: 14, color: '#374151', fontWeight: '600' },
   modalSubmit: { flex: 1, paddingVertical: 12, borderRadius: 12, backgroundColor: '#2563eb', alignItems: 'center' },
   modalSubmitDisabled: { opacity: 0.5 },

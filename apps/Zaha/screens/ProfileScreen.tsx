@@ -13,6 +13,7 @@ import {
 import { launchImageLibrary } from 'react-native-image-picker';
 import { api, type Profile } from '../lib/api';
 import { supabase } from '../lib/supabase';
+import FontIcon from '../components/FontIcon';
 
 type ProfileScreenProps = {
   onOpenFavorites?: () => void;
@@ -176,14 +177,20 @@ export default function ProfileScreen({ onOpenFavorites, onOpenReservations }: P
             <Image source={{ uri: avatarSource }} style={styles.avatar} />
           ) : (
             <View style={styles.avatarPlaceholder}>
-              <Text style={styles.avatarPlaceholderText}>🗿</Text>
+              <FontIcon name="user" width={40} height={40} fill="#9ca3af" />
             </View>
           )}
 
           {!editing ? (
             <>
               <Text style={styles.name}>{profile.name}</Text>
-              <Text style={styles.handle}>{profile.country_flag ?? '🌍'} {profile.country ?? 'Madagascar'}</Text>
+              <View style={styles.handleRow}>
+                <FontIcon name="globe" width={14} height={14} fill="#6b7280" />
+                <Text style={styles.handle}>
+                  {profile.country_flag ? `${profile.country_flag} ` : ''}
+                  {profile.country ?? 'Madagascar'}
+                </Text>
+              </View>
 
               {profile.bio || profile.description ? (
                 <Text style={styles.description}>{profile.bio ?? profile.description}</Text>
@@ -213,7 +220,10 @@ export default function ProfileScreen({ onOpenFavorites, onOpenReservations }: P
                 accessibilityRole="button"
                 accessibilityLabel="Voir mes lieux favoris"
               >
-                <Text style={styles.favoritesButtonText}>⭐ Mes favoris</Text>
+                <View style={styles.actionButtonInner}>
+                  <FontIcon name="star" width={16} height={16} fill="#eab308" />
+                  <Text style={styles.favoritesButtonText}>Mes favoris</Text>
+                </View>
               </TouchableOpacity>
 
               <TouchableOpacity
@@ -222,7 +232,10 @@ export default function ProfileScreen({ onOpenFavorites, onOpenReservations }: P
                 accessibilityRole="button"
                 accessibilityLabel="Voir mes réservations"
               >
-                <Text style={styles.reservationsButtonText}>📅 Mes réservations</Text>
+                <View style={styles.actionButtonInner}>
+                  <FontIcon name="calendar" width={16} height={16} fill="#2563eb" />
+                  <Text style={styles.reservationsButtonText}>Mes réservations</Text>
+                </View>
               </TouchableOpacity>
             </>
           ) : (
@@ -260,9 +273,12 @@ export default function ProfileScreen({ onOpenFavorites, onOpenReservations }: P
                 accessibilityRole="button"
                 accessibilityLabel="Changer la photo de profil"
               >
-                <Text style={styles.photoButtonText}>
-                  {pendingAvatarUri ? '📷 Photo choisie — changer' : '📷 Changer la photo'}
-                </Text>
+                <View style={styles.actionButtonInner}>
+                  <FontIcon name="camera" width={16} height={16} fill="#2563eb" />
+                  <Text style={styles.photoButtonText}>
+                    {pendingAvatarUri ? 'Photo choisie — changer' : 'Changer la photo'}
+                  </Text>
+                </View>
               </TouchableOpacity>
 
               <TouchableOpacity
@@ -330,9 +346,9 @@ const styles = StyleSheet.create({
   center: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24 },
   avatar: { width: 100, height: 100, borderRadius: 50, marginBottom: 16, alignSelf: 'center' },
   avatarPlaceholder: { width: 100, height: 100, borderRadius: 50, backgroundColor: '#e5e7eb', alignItems: 'center', justifyContent: 'center', marginBottom: 16, alignSelf: 'center' },
-  avatarPlaceholderText: { fontSize: 40 },
   name: { fontSize: 22, fontWeight: '700', color: '#111827', textAlign: 'center' },
-  handle: { fontSize: 14, color: '#6b7280', textAlign: 'center', marginTop: 4 },
+  handle: { fontSize: 14, color: '#6b7280' },
+  handleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, marginTop: 4 },
   description: { color: '#374151', fontSize: 15, lineHeight: 22, marginTop: 12, textAlign: 'center' },
   website: { color: '#2563eb', fontSize: 15, marginTop: 8, textAlign: 'center' },
   statsRow: { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'center', gap: 6, marginTop: 16 },
@@ -356,6 +372,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginTop: 8,
   },
+  actionButtonInner: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   editButton: { backgroundColor: '#2563eb' },
   editButtonText: { color: '#fff', fontWeight: '600' },
   favoritesButton: { backgroundColor: '#fff', borderWidth: 1, borderColor: '#2563eb' },

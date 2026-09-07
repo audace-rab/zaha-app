@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, BackHandler, SafeAreaView, StatusBar, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { supabase } from './lib/supabase';
 import AuthScreen from './screens/AuthScreen';
@@ -9,6 +10,8 @@ import PlaceDetailScreen from './screens/PlaceDetailScreen';
 import PlacesScreen from './screens/PlacesScreen';
 import ProfileScreen from './screens/ProfileScreen';
 import ReservationHistoryScreen from './screens/ReservationHistoryScreen';
+import FontIcon from './components/FontIcon';
+import PermissionModal from './components/PermissionModal';
 
 type Tab = 'feed' | 'places' | 'chat' | 'profile';
 
@@ -43,6 +46,8 @@ function AppInner() {
   // feedSearchInput = saisie en cours ; feedQuery = filtre validé (loupe / OK clavier).
   const [feedSearchInput, setFeedSearchInput] = useState('');
   const [feedQuery, setFeedQuery] = useState('');
+  // Popup des autorisations caméra + position (affiché une fois au premier lancement).
+  const [permissionsVisible, setPermissionsVisible] = useState(false);
 
   // Déclenché uniquement par la loupe ou la touche « Rechercher » du clavier.
   // Champ vide → '' → tout afficher.
@@ -82,6 +87,23 @@ function AppInner() {
       return () => authListener?.subscription?.unsubscribe();
     }
   }, []);
+
+  // Affiche le popup d'autorisations une seule fois, une fois la session chargée.
+  useEffect(() => {
+    if (loading || !session) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const requested = await AsyncStorage.getItem('zaha_permissions_requested');
+        if (!cancelled && requested !== 'true') setPermissionsVisible(true);
+      } catch {
+        if (!cancelled) setPermissionsVisible(true);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [loading, session]);
 
   // Bouton retour physique : fermer le détail lieu s'il est ouvert (consommer
   // l'événement), sinon laisser le comportement par défaut (quitter l'app
@@ -142,7 +164,7 @@ function AppInner() {
               accessibilityRole="button"
               accessibilityLabel="Rechercher dans le feed"
             >
-              <Text style={styles.headerSearchIcon}>🔍</Text>
+              <FontIcon name="magnifying-glass" width={15} height={15} fill="#374151" />
             </TouchableOpacity>
           </View>
         )}
@@ -197,15 +219,20 @@ function AppInner() {
               if (item.id !== 'profile') setShowReservations(false);
             }}
           >
-            <Text style={[styles.tabIcon, tab === item.id && styles.tabIconActive]}>
-              {item.id === 'feed' ? '📰' : item.id === 'places' ? '📍' : item.id === 'chat' ? '💬' : '👤'}
-            </Text>
+            <FontIcon
+              name={item.id === 'feed' ? 'newspaper' : item.id === 'places' ? 'location-dot' : item.id === 'chat' ? 'comment' : 'user'}
+              width={18}
+              height={18}
+              fill={tab === item.id ? '#2563eb' : '#6b7280'}
+            />
             <Text style={[styles.tabText, tab === item.id && styles.tabTextActive]}>
               {item.label}
             </Text>
           </TouchableOpacity>
         ))}
       </View>
+
+      <PermissionModal visible={permissionsVisible} onClose={() => setPermissionsVisible(false)} />
     </SafeAreaView>
   );
 }
@@ -239,7 +266,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 10,
   },
-  headerSearchIcon: { fontSize: 15 },
   content: { flex: 1 },
   placesStack: { flex: 1 },
   detailOverlay: {
@@ -258,8 +284,6 @@ const styles = StyleSheet.create({
   },
   tab: { flex: 1, paddingVertical: 10, alignItems: 'center', gap: 2 },
   tabActive: { borderTopWidth: 2, borderTopColor: '#2563eb' },
-  tabIcon: { fontSize: 18, color: '#6b7280' },
-  tabIconActive: { color: '#2563eb' },
   tabText: { color: '#6b7280', fontWeight: '500', fontSize: 11 },
   tabTextActive: { color: '#2563eb', fontWeight: '700' },
 });

@@ -1,7 +1,6 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
-  BackHandler,
   FlatList,
   Image,
   RefreshControl,
@@ -13,8 +12,8 @@ import {
   View,
 } from 'react-native';
 import Geolocation from '@react-native-community/geolocation';
-import { api, type MapPlace } from '../lib/api';
-import PlacesMap, { PlacesMapCard } from '../components/PlacesMap';
+import { api } from '../lib/api';
+import FontIcon, { type FontIconName } from '../components/FontIcon';
 
 type Place = {
   id: string;
@@ -55,8 +54,8 @@ type PlacesScreenProps = {
 };
 
 const CATEGORY_CONFIG = [
-  { key: 'restaurant', icon: '🍽️', label: 'Restaurant', color: '#ef4444' },
-  { key: 'hotel', icon: '🏨', label: 'Hôtel', color: '#2563eb' },
+  { key: 'restaurant', icon: 'utensils', label: 'Restaurant', color: '#ef4444' },
+  { key: 'hotel', icon: 'bed', label: 'Hôtel', color: '#2563eb' },
 ] as const;
 
 const VISIBLE_CATEGORIES = new Set(['restaurant', 'hotel']);
@@ -75,8 +74,6 @@ export default function PlacesScreen({ onSelectPlace }: PlacesScreenProps) {
   const [summary, setSummary] = useState('');
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [viewMode, setViewMode] = useState<'list' | 'map'>('list');
-  const [selectedOnMap, setSelectedOnMap] = useState<MapPlace | null>(null);
   // Formulaire de filtres replié par défaut ; déroulé si aucun résultat.
   const [filtersOpen, setFiltersOpen] = useState(false);
   // Mode « Autour de moi » : résultats triés par proximité GPS.
@@ -84,33 +81,21 @@ export default function PlacesScreen({ onSelectPlace }: PlacesScreenProps) {
   const [userCoords, setUserCoords] = useState<{ latitude: number; longitude: number } | null>(null);
   const [nearbyError, setNearbyError] = useState<string | null>(null);
 
-  // Résumé une ligne pour la barre repliée : « 📍 Ville · 🔍 texte/catégorie ».
+  // Résumé une ligne pour la barre repliée : « lieu · recherche/catégorie ».
   const filtersSummaryParts: string[] = [];
-  if (nearbyActive) filtersSummaryParts.push('📍 Autour de moi');
-  else if (locationName.trim()) filtersSummaryParts.push(`📍 ${locationName.trim()}`);
+  if (nearbyActive) filtersSummaryParts.push('Autour de moi');
+  else if (locationName.trim()) filtersSummaryParts.push(locationName.trim());
   if (searchQuery.trim() || category) {
-    filtersSummaryParts.push(`🔍 ${searchQuery.trim() || category}`);
+    filtersSummaryParts.push(searchQuery.trim() || category);
   }
   const filtersSummary =
     filtersSummaryParts.length > 0 ? filtersSummaryParts.join(' · ') : 'Filtres actifs';
 
-  // Lieux géolocalisables uniquement pour la carte.
-  const mapPlaces: MapPlace[] = useMemo(
-    () =>
-      places
-        .filter((p) => p.location)
-        .map((p) => ({
-          id: p.id,
-          name: p.name,
-          category: p.category ?? 'autre',
-          latitude: p.location!.latitude,
-          longitude: p.location!.longitude,
-          photoUrl: p.photoUrl,
-          isPro: p.isPro,
-          address: p.address,
-        })),
-    [places],
-  );
+  // Icônes résumant le filtre actif, affichées avant le texte.
+  const summaryIcons: FontIconName[] = [];
+  if (nearbyActive) summaryIcons.push('location-dot');
+  else if (locationName.trim()) summaryIcons.push('location-dot');
+  if (searchQuery.trim() || category) summaryIcons.push('magnifying-glass');
 
   // Chargement automatique : tous les lieux de la catégorie courante,
   // sans filtre. Rechargé uniquement au montage et au changement de catégorie.
@@ -195,7 +180,6 @@ export default function PlacesScreen({ onSelectPlace }: PlacesScreenProps) {
       const filtered = (result.places ?? []).filter(keepVisible);
       setPlaces(filtered);
       setSummary('Lieux autour de vous (rayon 5 km)');
-      setViewMode('list');
       setFiltersOpen(filtered.length === 0);
     } catch (e) {
       setPlaces([]);
@@ -235,17 +219,6 @@ export default function PlacesScreen({ onSelectPlace }: PlacesScreenProps) {
     );
   };
 
-  // Bouton retour physique : en mode carte, revenir à la liste (consommer l'événement).
-  useEffect(() => {
-    if (viewMode !== 'map') return;
-    const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
-      setViewMode('list');
-      setSelectedOnMap(null);
-      return true;
-    });
-    return () => subscription.remove();
-  }, [viewMode]);
-
   const hasActiveSearch = Boolean(locationName.trim() || searchQuery.trim());
 
   return (
@@ -259,9 +232,14 @@ export default function PlacesScreen({ onSelectPlace }: PlacesScreenProps) {
           filtersOpen ? 'Replier les filtres de recherche' : 'Dérouler les filtres de recherche'
         }
       >
-        <Text numberOfLines={1} style={styles.filtersBarSummary}>
-          {filtersSummary}
-        </Text>
+        <View style={styles.filtersBarSummaryArea}>
+          {summaryIcons.map((icon, i) => (
+            <FontIcon key={i} name={icon} width={14} height={14} fill="#2563eb" />
+          ))}
+          <Text numberOfLines={1} style={styles.filtersBarSummary}>
+            {filtersSummary}
+          </Text>
+        </View>
         <Text style={styles.filtersBarChevron}>{filtersOpen ? '▲ Replier' : '▼ Dérouler'}</Text>
       </TouchableOpacity>
 
@@ -279,7 +257,7 @@ export default function PlacesScreen({ onSelectPlace }: PlacesScreenProps) {
               accessibilityLabel="Toutes les catégories"
               accessibilityState={{ selected: category === '' }}
             >
-              <Text style={styles.chipIcon}>🌍</Text>
+              <FontIcon name="globe" width={18} height={18} fill="#374151" />
               <Text style={[styles.chipText, category === '' && styles.chipTextActive]}>Tous</Text>
             </TouchableOpacity>
             {CATEGORY_CONFIG.map((cat) => (
@@ -294,7 +272,7 @@ export default function PlacesScreen({ onSelectPlace }: PlacesScreenProps) {
                 accessibilityLabel={`Filtrer par catégorie : ${cat.label}`}
                 accessibilityState={{ selected: category === cat.key }}
               >
-                <Text style={styles.chipIcon}>{cat.icon}</Text>
+                <FontIcon name={cat.icon} width={18} height={18} fill="#374151" />
                 <Text style={[styles.chipText, category === cat.key && styles.chipTextActive]}>
                   {cat.label}
                 </Text>
@@ -342,7 +320,7 @@ export default function PlacesScreen({ onSelectPlace }: PlacesScreenProps) {
 
       {nearbyError ? <Text style={styles.nearbyError}>{nearbyError}</Text> : null}
 
-      {!loading && (mapPlaces.length > 0 || nearbyActive) ? (
+      {!loading && (places.length > 0 || nearbyActive) ? (
         <View style={styles.actionsRow}>
           <TouchableOpacity
             style={[styles.mapToggle, nearbyActive && styles.mapToggleActive]}
@@ -351,67 +329,25 @@ export default function PlacesScreen({ onSelectPlace }: PlacesScreenProps) {
             accessibilityRole="button"
             accessibilityLabel="Trouver des lieux autour de moi"
           >
-            <Text style={[styles.mapToggleText, nearbyActive && styles.mapToggleActiveText]}>
-              {nearbyActive ? '📍 Autour de moi ✓' : '📍 Autour de moi'}
-            </Text>
+            <View style={styles.mapToggleInner}>
+              <FontIcon
+                name="location-dot"
+                width={16}
+                height={16}
+                fill={nearbyActive ? '#fff' : '#2563eb'}
+              />
+              <Text style={[styles.mapToggleText, nearbyActive && styles.mapToggleActiveText]}>
+                Autour de moi
+              </Text>
+              {nearbyActive ? (
+                <FontIcon name="check" width={13} height={13} fill="#fff" />
+              ) : null}
+            </View>
           </TouchableOpacity>
-          {!nearbyActive && mapPlaces.length > 0 ? (
-            <TouchableOpacity
-              style={styles.mapToggle}
-              activeOpacity={0.8}
-              onPress={() => setViewMode('map')}
-              accessibilityRole="button"
-              accessibilityLabel="Voir les résultats sur la carte"
-            >
-              <Text style={styles.mapToggleText}>🗺️ Voir sur la carte ({mapPlaces.length})</Text>
-            </TouchableOpacity>
-          ) : null}
-          {nearbyActive && mapPlaces.length > 0 ? (
-            <TouchableOpacity
-              style={styles.mapToggle}
-              activeOpacity={0.8}
-              onPress={() => setViewMode('map')}
-              accessibilityRole="button"
-              accessibilityLabel="Voir les lieux à proximité sur la carte"
-            >
-              <Text style={styles.mapToggleText}>🗺️ Carte ({mapPlaces.length})</Text>
-            </TouchableOpacity>
-          ) : null}
         </View>
       ) : null}
 
-      {viewMode === 'map' ? (
-        <View style={styles.mapWrap}>
-          <PlacesMap
-            places={mapPlaces}
-            onSelectPlace={(place) =>
-              setSelectedOnMap((prev) => (prev?.id === place.id ? null : place))
-            }
-          />
-          <View style={styles.mapCardWrap} pointerEvents="box-none">
-            <PlacesMapCard
-              place={selectedOnMap}
-              onViewDetail={() => {
-                if (!selectedOnMap) return;
-                onSelectPlace?.({
-                  id: selectedOnMap.id,
-                  name: selectedOnMap.name,
-                  category: selectedOnMap.category,
-                  address: selectedOnMap.address,
-                  photoUrl: selectedOnMap.photoUrl,
-                  isPro: selectedOnMap.isPro,
-                  location: {
-                    latitude: selectedOnMap.latitude,
-                    longitude: selectedOnMap.longitude,
-                  },
-                });
-                setSelectedOnMap(null);
-              }}
-            />
-          </View>
-        </View>
-      ) : (
-        <FlatList
+      <FlatList
         data={places}
         keyExtractor={(item) => item.id}
         refreshControl={
@@ -434,7 +370,7 @@ export default function PlacesScreen({ onSelectPlace }: PlacesScreenProps) {
               <Image source={{ uri: item.photoUrl }} style={styles.thumbnail} />
             ) : (
               <View style={[styles.thumbnail, styles.thumbnailPlaceholder]}>
-                <Text style={styles.thumbnailPlaceholderText}>📍</Text>
+                <FontIcon name="location-dot" width={28} height={28} fill="#9ca3af" />
               </View>
             )}
             <View style={styles.cardBody}>
@@ -465,7 +401,9 @@ export default function PlacesScreen({ onSelectPlace }: PlacesScreenProps) {
         ListEmptyComponent={
           !loading ? (
             <View style={styles.emptyState}>
-              <Text style={styles.emptyIcon}>📍</Text>
+              <View style={styles.emptyIcon}>
+                <FontIcon name="location-dot" width={44} height={44} fill="#9ca3af" />
+              </View>
               <Text style={styles.emptyTitle}>Aucun lieu trouvé</Text>
               <Text style={styles.emptyMessage}>
                 {hasActiveSearch
@@ -495,7 +433,6 @@ export default function PlacesScreen({ onSelectPlace }: PlacesScreenProps) {
           ) : undefined
         }
         />
-      )}
     </View>
   );
 }
@@ -515,10 +452,12 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     marginBottom: 12,
   },
+  filtersBarSummaryArea: { flexDirection: 'row', alignItems: 'center', gap: 5, flexShrink: 1 },
   filtersBarSummary: { color: '#111827', fontSize: 14, fontWeight: '600', flexShrink: 1 },
   filtersBarChevron: { color: '#2563eb', fontWeight: '600', fontSize: 13 },
   nearbyError: { color: '#dc2626', marginBottom: 12 },
   actionsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 12 },
+  mapToggleInner: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   mapToggleActive: { backgroundColor: '#2563eb' },
   mapToggleActiveText: { color: '#fff' },
   chipsRow: { gap: 10, marginBottom: 50, paddingVertical: 4 },
@@ -533,7 +472,6 @@ const styles = StyleSheet.create({
     height: 40,
   },
   chipAllActive: { backgroundColor: '#374151' },
-  chipIcon: { fontSize: 18 },
   chipText: { fontSize: 15, color: '#374151', fontWeight: '600' },
   chipTextActive: { color: '#fff' },
   input: {
@@ -565,18 +503,6 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   mapToggleText: { color: '#2563eb', fontWeight: '600' },
-  mapWrap: {
-    flex: 1,
-    borderRadius: 12,
-    overflow: 'hidden',
-    position: 'relative',
-  },
-  mapCardWrap: {
-    position: 'absolute',
-    left: 12,
-    right: 12,
-    bottom: 12,
-  },
   card: {
     flexDirection: 'row',
     padding: 12,
@@ -589,7 +515,6 @@ const styles = StyleSheet.create({
   },
   thumbnail: { width: 84, height: 84, borderRadius: 10, backgroundColor: '#f3f4f6' },
   thumbnailPlaceholder: { alignItems: 'center', justifyContent: 'center' },
-  thumbnailPlaceholderText: { fontSize: 28, opacity: 0.5 },
   cardBody: { flex: 1 },
   cardTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 },
   proBadge: {
@@ -609,7 +534,7 @@ const styles = StyleSheet.create({
   snippet: { marginTop: 6, fontSize: 14 },
   rating: { marginTop: 6, color: '#ca8a04', fontWeight: '600' },
   emptyState: { alignItems: 'center', paddingVertical: 40, paddingHorizontal: 24 },
-  emptyIcon: { fontSize: 44, marginBottom: 12 },
+  emptyIcon: { alignItems: 'center', justifyContent: 'center', marginBottom: 12 },
   emptyTitle: { fontSize: 17, fontWeight: '700', color: '#111827', marginBottom: 6 },
   emptyMessage: { color: '#6b7280', textAlign: 'center', marginBottom: 16 },
   emptyButton: {

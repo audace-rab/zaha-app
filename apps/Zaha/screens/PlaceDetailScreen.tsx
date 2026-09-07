@@ -18,6 +18,8 @@ import { api } from '../lib/api';
 import { supabase } from '../lib/supabase';
 import ReservationScreen from './ReservationScreen';
 import ShareIcon from '../components/ShareIcon';
+import RouteIcon from '../components/RouteIcon';
+import FontIcon from '../components/FontIcon';
 
 const DEMO_USER_ID = 'a1000000-0000-0000-0000-000000000001';
 
@@ -286,7 +288,7 @@ export default function PlaceDetailScreen({ place }: PlaceDetailScreenProps) {
         </View>
       ) : (
         <View style={[styles.photo, styles.photoPlaceholder]}>
-          <Text style={styles.photoPlaceholderText}>📍</Text>
+          <FontIcon name="location-dot" width={56} height={56} fill="#9ca3af" />
         </View>
       )}
 
@@ -313,8 +315,18 @@ export default function PlaceDetailScreen({ place }: PlaceDetailScreenProps) {
         ) : place.address ? (
           <Text style={styles.line}>{place.address}</Text>
         ) : null}
-        {place.openingHours ? <Text style={styles.line}>🕒 {place.openingHours}</Text> : null}
-        {place.phoneNumber ? <Text style={styles.line}>📞 {place.phoneNumber}</Text> : null}
+        {place.openingHours ? (
+          <View style={styles.lineIconRow}>
+            <FontIcon name="clock" width={14} height={14} fill="#374151" />
+            <Text style={styles.line}>{place.openingHours}</Text>
+          </View>
+        ) : null}
+        {place.phoneNumber ? (
+          <View style={styles.lineIconRow}>
+            <FontIcon name="phone" width={14} height={14} fill="#374151" />
+            <Text style={styles.line}>{place.phoneNumber}</Text>
+          </View>
+        ) : null}
         {place.snippet ? <Text style={styles.snippet}>{place.snippet}</Text> : null}
 
         <TouchableOpacity
@@ -323,7 +335,10 @@ export default function PlaceDetailScreen({ place }: PlaceDetailScreenProps) {
           accessibilityRole="button"
           accessibilityLabel="Réserver ce lieu"
         >
-          <Text style={styles.reserveButtonText}>📅 Réserver</Text>
+          <View style={styles.iconButtonContent}>
+            <FontIcon name="calendar" width={16} height={16} fill="#fff" />
+            <Text style={styles.reserveButtonText}>Réserver</Text>
+          </View>
         </TouchableOpacity>
 
         <View style={styles.actionsRow}>
@@ -335,14 +350,17 @@ export default function PlaceDetailScreen({ place }: PlaceDetailScreenProps) {
               accessibilityState={{ selected: showMap }}
               accessibilityLabel={showMap ? 'Masquer la carte' : 'Voir sur la carte'}
             >
-              <Text
-                style={[styles.mapButtonText, showMap && styles.mapButtonTextActive]}
-                numberOfLines={1}
-                adjustsFontSizeToFit
-                minimumFontScale={0.8}
-              >
-                {showMap ? '🗺️ Masquer la carte' : '🗺️ Voir la carte'}
-              </Text>
+              <View style={styles.iconButtonContent}>
+                <FontIcon name="map" width={16} height={16} fill="#2563eb" />
+                <Text
+                  style={[styles.mapButtonText, showMap && styles.mapButtonTextActive]}
+                  numberOfLines={1}
+                  adjustsFontSizeToFit
+                  minimumFontScale={0.8}
+                >
+                  {showMap ? 'Masquer la carte' : 'Voir la carte'}
+                </Text>
+              </View>
             </TouchableOpacity>
           )}
           <TouchableOpacity
@@ -351,14 +369,21 @@ export default function PlaceDetailScreen({ place }: PlaceDetailScreenProps) {
             accessibilityRole="button"
             accessibilityLabel={bookmarked ? 'Retirer des favoris' : 'Ajouter aux favoris'}
           >
-            <Text
-              style={[styles.bookmarkButtonText, bookmarked && styles.bookmarkButtonTextActive]}
-              numberOfLines={1}
-              adjustsFontSizeToFit
-              minimumFontScale={0.8}
-            >
-              {bookmarked ? '❤️ Sauvegardé' : '♡ Sauvegarder'}
-            </Text>
+            <View style={styles.iconButtonContent}>
+                {bookmarked ? (
+                  <FontIcon name="heart" width={14} height={14} fill="#ef4444" />
+                ) : (
+                  <FontIcon name="heart-outline" width={14} height={14} fill="#374151" />
+                )}
+                <Text
+                  style={[styles.bookmarkButtonText, bookmarked && styles.bookmarkButtonTextActive]}
+                  numberOfLines={1}
+                  adjustsFontSizeToFit
+                  minimumFontScale={0.8}
+                >
+                  {bookmarked ? 'Sauvegardé' : 'Sauvegarder'}
+                </Text>
+              </View>
           </TouchableOpacity>
           <TouchableOpacity
             style={styles.actionButton}
@@ -381,27 +406,45 @@ export default function PlaceDetailScreen({ place }: PlaceDetailScreenProps) {
         </View>
 
         {showMap && place.location && (
-          <MapView
-            key={place.id}
-            style={styles.detailMap}
-            scrollEnabled
-            zoomEnabled
-            initialRegion={{
-              latitude: place.location.latitude,
-              longitude: place.location.longitude,
-              latitudeDelta: 0.01,
-              longitudeDelta: 0.01,
-            }}
-          >
-            <Marker
-              coordinate={{
+          <View style={styles.mapContainer}>
+            <MapView
+              key={place.id}
+              style={styles.detailMap}
+              scrollEnabled
+              zoomEnabled
+              initialRegion={{
                 latitude: place.location.latitude,
                 longitude: place.location.longitude,
+                latitudeDelta: 0.01,
+                longitudeDelta: 0.01,
               }}
-              title={place.name}
-              pinColor="#2563eb"
-            />
-          </MapView>
+            >
+              <Marker
+                coordinate={{
+                  latitude: place.location.latitude,
+                  longitude: place.location.longitude,
+                }}
+                title={place.name}
+                pinColor="#2563eb"
+              />
+            </MapView>
+            <TouchableOpacity
+              style={styles.mapDirectionsButton}
+              activeOpacity={0.8}
+              accessibilityRole="button"
+              accessibilityLabel="Itinéraire vers ce lieu"
+              onPress={() =>
+                Linking.openURL(
+                  `https://www.google.com/maps/dir/?api=1&destination=${place.location!.latitude},${place.location!.longitude}`
+                ).catch(() => {})
+              }
+            >
+              <View style={styles.directionsButtonContent}>
+                <RouteIcon width={16} height={16} fill="#fff" />
+                <Text style={styles.mapDirectionsButtonText}>Itinéraire</Text>
+              </View>
+            </TouchableOpacity>
+          </View>
         )}
 
         {/* ── Avis ── */}
@@ -439,9 +482,17 @@ export default function PlaceDetailScreen({ place }: PlaceDetailScreenProps) {
               accessibilityRole="button"
               accessibilityLabel={myReview ? 'Modifier votre avis' : 'Écrire un avis'}
             >
-              <Text style={styles.reviewFormToggleText}>
-                {myReview ? '✏️ Modifier votre avis' : '💬 Écrire un avis'}
-              </Text>
+              {myReview ? (
+                <View style={styles.iconButtonContent}>
+                  <FontIcon name="pen" width={14} height={14} fill="#2563eb" />
+                  <Text style={styles.reviewFormToggleText}>Modifier votre avis</Text>
+                </View>
+              ) : (
+                <View style={styles.iconButtonContent}>
+                  <FontIcon name="comment" width={14} height={14} fill="#2563eb" />
+                  <Text style={styles.reviewFormToggleText}>Écrire un avis</Text>
+                </View>
+              )}
             </TouchableOpacity>
           )}
 
@@ -518,7 +569,7 @@ export default function PlaceDetailScreen({ place }: PlaceDetailScreenProps) {
                   <Image source={{ uri: review.user.avatar_url }} style={styles.reviewAvatar} />
                 ) : (
                   <View style={styles.reviewAvatarFallback}>
-                    <Text style={styles.reviewAvatarFallbackText}>🗿</Text>
+                    <FontIcon name="user" width={18} height={18} fill="#9ca3af" />
                   </View>
                 )}
                 <View style={styles.reviewCardMeta}>
@@ -568,7 +619,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   photoPlaceholder: { alignItems: 'center', justifyContent: 'center' },
-  photoPlaceholderText: { fontSize: 56, opacity: 0.4 },
   detailMap: {
     width: '100%',
     height: 220,
@@ -576,6 +626,25 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     marginTop: 4,
   },
+  mapContainer: {
+    position: 'relative',
+  },
+  mapDirectionsButton: {
+    position: 'absolute',
+    bottom: 16,
+    alignSelf: 'center',
+    backgroundColor: '#2563eb',
+    paddingVertical: 10,
+    paddingHorizontal: 18,
+    borderRadius: 12,
+    shadowColor: '#000',
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 4,
+  },
+  mapDirectionsButtonText: { color: '#fff', fontWeight: '700', fontSize: 14 },
+  directionsButtonContent: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   body: { padding: 16, gap: 8 },
   titleRow: { flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' },
   proBadge: {
@@ -591,10 +660,17 @@ const styles = StyleSheet.create({
   name: { fontSize: 22, fontWeight: '700', color: '#111827', flexShrink: 1 },
   rating: { color: '#ca8a04', fontWeight: '700', fontSize: 16 },
   line: { color: '#374151', fontSize: 15 },
+  lineIconRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   addressLink: { textDecorationLine: 'underline' },
   snippet: { color: '#6b7280', fontSize: 15, lineHeight: 22, marginTop: 4 },
-  mapButtonText: { color: '#2563eb', fontWeight: '600', fontSize: 13 },
+  mapButtonText: { color: '#2563eb', fontWeight: '600', fontSize: 13, flexShrink: 1 },
   mapButtonTextActive: { color: '#2563eb', fontWeight: '700' },
+  iconButtonContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+  },
   shareButtonText: { color: '#374151', fontWeight: '600', fontSize: 13 },
   shareButtonContent: {
     flexDirection: 'row',
@@ -615,7 +691,7 @@ const styles = StyleSheet.create({
     borderColor: '#ef4444',
     backgroundColor: '#fef2f2',
   },
-  bookmarkButtonText: { color: '#374151', fontWeight: '600', fontSize: 13 },
+  bookmarkButtonText: { color: '#374151', fontWeight: '600', fontSize: 13, flexShrink: 1 },
   bookmarkButtonTextActive: { color: '#ef4444', fontWeight: '700' },
   actionsRow: {
     flexDirection: 'row',
@@ -746,7 +822,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  reviewAvatarFallbackText: { fontSize: 18 },
   reviewCardMeta: { flex: 1 },
   reviewAuthor: { fontSize: 14, fontWeight: '600', color: '#111827' },
   reviewDate: { fontSize: 12, color: '#9ca3af' },

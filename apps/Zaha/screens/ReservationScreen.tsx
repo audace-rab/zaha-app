@@ -12,6 +12,7 @@ import {
 import DateTimePicker, { type DateTimePickerEvent } from '@react-native-community/datetimepicker';
 import { supabase } from '../lib/supabase';
 import { api } from '../lib/api';
+import FontIcon, { type FontIconName } from '../components/FontIcon';
 
 const DEMO_USER_ID = 'a1000000-0000-0000-0000-000000000001';
 
@@ -32,11 +33,11 @@ type ReservationScreenProps = {
 const ROOM_TYPES = ['Simple', 'Double', 'Suite', 'Familiale'];
 const ACTIVITY_SLOTS = ['Matin', 'Après-midi', 'Journée complète'];
 
-const TYPE_INFO: Record<ReservationType, { label: string; icon: string }> = {
-  table: { label: 'Réservation de table', icon: '🍽️' },
-  hotel: { label: 'Réservation d\'hôtel', icon: '🏨' },
-  activity: { label: 'Réservation d\'activité', icon: '🎭' },
-  general: { label: 'Réservation', icon: '📋' },
+const TYPE_INFO: Record<ReservationType, { label: string; icon: FontIconName }> = {
+  table: { label: 'Réservation de table', icon: 'utensils' },
+  hotel: { label: 'Réservation d\'hôtel', icon: 'bed' },
+  activity: { label: 'Réservation d\'activité', icon: 'masks-theater' },
+  general: { label: 'Réservation', icon: 'clipboard-list' },
 };
 
 function deriveType(category?: string): ReservationType {
@@ -137,19 +138,30 @@ export default function ReservationScreen({ place, onDone }: ReservationScreenPr
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      <Text style={styles.placeName}>📍 {place.name}</Text>
+      <View style={styles.placeNameRow}>
+        <FontIcon name="location-dot" width={18} height={18} fill="#111827" />
+        <Text style={styles.placeName}>{place.name}</Text>
+      </View>
       {place.address ? <Text style={styles.placeAddress}>{place.address}</Text> : null}
 
       {/* Type dérivé (lecture seule) */}
       <View style={styles.typeBadge}>
-        <Text style={styles.typeBadgeIcon}>{TYPE_INFO[reservationType].icon}</Text>
+        <FontIcon
+          name={TYPE_INFO[reservationType].icon}
+          width={14}
+          height={14}
+          fill="#1d4ed8"
+        />
         <Text style={styles.typeBadgeText}>{TYPE_INFO[reservationType].label}</Text>
       </View>
 
       {/* Date */}
       <Text style={styles.label}>Date *</Text>
       <TouchableOpacity style={styles.input} onPress={() => setShowDatePicker(true)} accessibilityRole="button" accessibilityLabel="Choisir la date">
-        <Text style={styles.dateText}>📅 {formatDateDisplay(dateObj)}</Text>
+        <View style={styles.dateTextRow}>
+          <FontIcon name="calendar" width={16} height={16} fill="#6b7280" />
+          <Text style={styles.dateText}>{formatDateDisplay(dateObj)}</Text>
+        </View>
       </TouchableOpacity>
       {showDatePicker && (
         <DateTimePicker
@@ -166,7 +178,10 @@ export default function ReservationScreen({ place, onDone }: ReservationScreenPr
         <View style={styles.halfField}>
           <Text style={styles.label}>Heure début</Text>
           <TouchableOpacity style={styles.input} onPress={() => setShowTimeStart(true)} accessibilityRole="button" accessibilityLabel="Choisir l'heure de début">
-            <Text style={styles.dateText}>🕐 {formatTime(timeStartObj)}</Text>
+            <View style={styles.dateTextRow}>
+              <FontIcon name="clock" width={16} height={16} fill="#6b7280" />
+              <Text style={styles.dateText}>{formatTime(timeStartObj)}</Text>
+            </View>
           </TouchableOpacity>
           {showTimeStart && (
             <DateTimePicker
@@ -181,7 +196,10 @@ export default function ReservationScreen({ place, onDone }: ReservationScreenPr
         <View style={styles.halfField}>
           <Text style={styles.label}>Heure fin</Text>
           <TouchableOpacity style={styles.input} onPress={() => setShowTimeEnd(true)} accessibilityRole="button" accessibilityLabel="Choisir l'heure de fin">
-            <Text style={styles.dateText}>🕐 {formatTime(timeEndObj)}</Text>
+            <View style={styles.dateTextRow}>
+              <FontIcon name="clock" width={16} height={16} fill="#6b7280" />
+              <Text style={styles.dateText}>{formatTime(timeEndObj)}</Text>
+            </View>
           </TouchableOpacity>
           {showTimeEnd && (
             <DateTimePicker
@@ -288,6 +306,7 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#f9fafb' },
   content: { padding: 16, paddingBottom: 40, gap: 8 },
   placeName: { fontSize: 18, fontWeight: '700', color: '#111827', marginBottom: 2 },
+  placeNameRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   placeAddress: { color: '#6b7280', fontSize: 14, marginBottom: 12 },
   label: { fontSize: 14, fontWeight: '600', color: '#374151', marginTop: 12, marginBottom: 6 },
   typeBadge: {
@@ -303,7 +322,6 @@ const styles = StyleSheet.create({
     borderColor: '#bfdbfe',
     marginBottom: 4,
   },
-  typeBadgeIcon: { fontSize: 14 },
   typeBadgeText: { fontSize: 13, color: '#1d4ed8', fontWeight: '600' },
   input: {
     borderWidth: 1,
@@ -315,6 +333,7 @@ const styles = StyleSheet.create({
     fontSize: 15,
   },
   dateText: { fontSize: 15, color: '#111827' },
+  dateTextRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   inputMultiline: { minHeight: 72, textAlignVertical: 'top' },
   row: { flexDirection: 'row', gap: 12 },
   halfField: { flex: 1 },

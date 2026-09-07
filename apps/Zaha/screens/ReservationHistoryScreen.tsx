@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import { supabase } from '../lib/supabase';
 import { api, type Reservation } from '../lib/api';
+import FontIcon from '../components/FontIcon';
 
 const DEMO_USER_ID = 'a1000000-0000-0000-0000-000000000001';
 
@@ -144,7 +145,9 @@ export default function ReservationHistoryScreen({ onBack }: ReservationHistoryS
             </View>
           ) : (
             <View style={styles.emptyState}>
-              <Text style={styles.emptyIcon}>📅</Text>
+              <View style={styles.emptyIcon}>
+                <FontIcon name="calendar" width={44} height={44} fill="#9ca3af" />
+              </View>
               <Text style={styles.emptyTitle}>
                 {filter === 'all' ? 'Aucune réservation' : 'Aucune réservation dans cette catégorie'}
               </Text>
@@ -161,22 +164,51 @@ export default function ReservationHistoryScreen({ onBack }: ReservationHistoryS
           return (
             <View style={styles.card}>
               <View style={styles.cardHeader}>
-                <Text style={styles.cardPlace}>📍 {(item as any).place?.name ?? item.place_name ?? 'Lieu'}</Text>
+                <View style={styles.cardHeaderLeft}>
+                  <FontIcon name="location-dot" width={14} height={14} fill="#111827" />
+                  <Text style={styles.cardPlace}>{(item as any).place?.name ?? item.place_name ?? 'Lieu'}</Text>
+                </View>
                 <View style={[styles.statusBadge, { backgroundColor: statusCfg.bg }]}>
                   <Text style={[styles.statusText, { color: statusCfg.color }]}>{statusCfg.label}</Text>
                 </View>
               </View>
-              <Text style={styles.cardDate}>
-                📅 {item.date}
-                {item.time_start ? ` · 🕐 ${item.time_start}` : ''}
-                {item.time_end ? ` – ${item.time_end}` : ''}
-              </Text>
-              <Text style={styles.cardGuests}>
-                👥 {item.guests} convive{item.guests > 1 ? 's' : ''}
-                {item.room_type ? ` · 🛏️ ${item.room_type}` : ''}
-                {item.activity_slot ? ` · 🎭 ${item.activity_slot}` : ''}
-              </Text>
-              {item.note ? <Text style={styles.cardNote}>💬 {item.note}</Text> : null}
+              <View style={styles.cardDateRow}>
+                <FontIcon name="calendar" width={14} height={14} fill="#374151" />
+                <Text style={styles.cardDate}>{item.date}</Text>
+                {item.time_start ? (
+                  <>
+                    <FontIcon name="clock" width={14} height={14} fill="#374151" />
+                    <Text style={styles.cardDate}>{item.time_start}</Text>
+                  </>
+                ) : null}
+                {item.time_end ? <Text style={styles.cardDate}>– {item.time_end}</Text> : null}
+              </View>
+              <View style={styles.cardGuestsRow}>
+                <View style={styles.cardGuestsItem}>
+                  <FontIcon name="users" width={14} height={14} fill="#6b7280" />
+                  <Text style={styles.cardGuests}>
+                    {item.guests} convive{item.guests > 1 ? 's' : ''}
+                  </Text>
+                </View>
+                {item.room_type ? (
+                  <View style={styles.cardGuestsItem}>
+                    <FontIcon name="bed" width={14} height={14} fill="#6b7280" />
+                    <Text style={styles.cardGuests}>{item.room_type}</Text>
+                  </View>
+                ) : null}
+                {item.activity_slot ? (
+                  <View style={styles.cardGuestsItem}>
+                    <FontIcon name="masks-theater" width={14} height={14} fill="#6b7280" />
+                    <Text style={styles.cardGuests}>{item.activity_slot}</Text>
+                  </View>
+                ) : null}
+              </View>
+              {item.note ? (
+                <View style={styles.cardNoteRow}>
+                  <FontIcon name="comment" width={14} height={14} fill="#6b7280" />
+                  <Text style={styles.cardNote}>{item.note}</Text>
+                </View>
+              ) : null}
               {item.status === 'pending' && (
                 <TouchableOpacity
                   style={styles.cancelBtn}
@@ -219,7 +251,7 @@ const styles = StyleSheet.create({
   list: { padding: 16, paddingBottom: 40, alignItems: 'flex-start' },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingVertical: 60 },
   emptyState: { alignItems: 'center', paddingVertical: 60, paddingHorizontal: 24 },
-  emptyIcon: { fontSize: 44, marginBottom: 12 },
+  emptyIcon: { alignItems: 'center', justifyContent: 'center', marginBottom: 12 },
   emptyTitle: { fontSize: 17, fontWeight: '700', color: '#111827', marginBottom: 6 },
   emptyMessage: { color: '#6b7280', textAlign: 'center' },
   card: {
@@ -231,13 +263,18 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     gap: 6,
   },
-  cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 8 },
+  cardHeaderLeft: { flexDirection: 'row', alignItems: 'center', gap: 4, flexShrink: 1 },
   cardPlace: { fontSize: 15, fontWeight: '600', color: '#111827', flexShrink: 1 },
-  statusBadge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 12 },
+  statusBadge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 12, flexShrink: 0 },
   statusText: { fontSize: 11, fontWeight: '700' },
   cardDate: { color: '#374151', fontSize: 14 },
+  cardDateRow: { flexDirection: 'row', alignItems: 'center', gap: 4, flexWrap: 'wrap' },
   cardGuests: { color: '#6b7280', fontSize: 13 },
-  cardNote: { color: '#6b7280', fontSize: 13, fontStyle: 'italic', marginTop: 2 },
+  cardGuestsRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 12 },
+  cardGuestsItem: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  cardNoteRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  cardNote: { color: '#6b7280', fontSize: 13, fontStyle: 'italic', marginTop: 0, flexShrink: 1 },
   cancelBtn: {
     marginTop: 8,
     alignSelf: 'flex-start',
