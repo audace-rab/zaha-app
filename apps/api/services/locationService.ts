@@ -210,6 +210,7 @@ function mapRowToPlace(row: Record<string, unknown>): Place {
   return {
     id: String(row.id),
     name: String(row.name ?? 'Lieu sans nom'),
+    category: row.category != null ? String(row.category) : undefined,
     address: row.address != null ? String(row.address) : undefined,
     snippet: row.snippet != null ? String(row.snippet) : undefined,
     rating: row.rating != null ? Number(row.rating) : undefined,

@@ -521,7 +521,7 @@ const styles = StyleSheet.create({
   actionsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 12 },
   mapToggleActive: { backgroundColor: '#2563eb' },
   mapToggleActiveText: { color: '#fff' },
-  chipsRow: { gap: 10, marginBottom: 50, paddingVertical: 4 },
+  chipsRow: { gap: 10, marginBottom: -100, paddingVertical: 4 },
   chip: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -530,7 +530,7 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     borderRadius: 20,
     backgroundColor: '#f3f4f6',
-    minHeight: 26,
+    height: 40,
   },
   chipAllActive: { backgroundColor: '#374151' },
   chipIcon: { fontSize: 18 },
