@@ -17,6 +17,7 @@ import MapView, { Marker } from 'react-native-maps';
 import { api } from '../lib/api';
 import { supabase } from '../lib/supabase';
 import ReservationScreen from './ReservationScreen';
+import ShareIcon from '../components/ShareIcon';
 
 const DEMO_USER_ID = 'a1000000-0000-0000-0000-000000000001';
 
@@ -365,14 +366,17 @@ export default function PlaceDetailScreen({ place }: PlaceDetailScreenProps) {
             accessibilityRole="button"
             accessibilityLabel="Partager ce lieu"
           >
-            <Text
-              style={styles.shareButtonText}
-              numberOfLines={1}
-              adjustsFontSizeToFit
-              minimumFontScale={0.8}
-            >
-              ✈️ Partager
-            </Text>
+            <View style={styles.shareButtonContent}>
+              <ShareIcon width={18} height={18} fill="#2563eb" />
+              <Text
+                style={styles.shareButtonText}
+                numberOfLines={1}
+                adjustsFontSizeToFit
+                minimumFontScale={0.8}
+              >
+                Partager
+              </Text>
+            </View>
           </TouchableOpacity>
         </View>
 
@@ -592,6 +596,12 @@ const styles = StyleSheet.create({
   mapButtonText: { color: '#2563eb', fontWeight: '600', fontSize: 13 },
   mapButtonTextActive: { color: '#2563eb', fontWeight: '700' },
   shareButtonText: { color: '#374151', fontWeight: '600', fontSize: 13 },
+  shareButtonContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+  },
   reserveButton: {
     backgroundColor: '#2563eb',
     paddingVertical: 14,

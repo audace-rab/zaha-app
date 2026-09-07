@@ -516,7 +516,7 @@ const styles = StyleSheet.create({
   actionsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 12 },
   mapToggleActive: { backgroundColor: '#2563eb' },
   mapToggleActiveText: { color: '#fff' },
-  chipsRow: { gap: 10, marginBottom: 30, paddingVertical: 4 },
+  chipsRow: { gap: 10, marginBottom: 50, paddingVertical: 4 },
   chip: {
     flexDirection: 'row',
     alignItems: 'center',
