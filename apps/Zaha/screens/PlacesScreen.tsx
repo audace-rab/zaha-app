@@ -57,11 +57,13 @@ type PlacesScreenProps = {
 const CATEGORY_CONFIG = [
   { key: 'restaurant', icon: '🍽️', label: 'Restaurant', color: '#ef4444' },
   { key: 'hotel', icon: '🏨', label: 'Hôtel', color: '#2563eb' },
-  { key: 'nature', icon: '🌿', label: 'Nature', color: '#16a34a' },
-  { key: 'activités', icon: '🎭', label: 'Activité', color: '#8b5cf6' },
-  { key: 'pharmacie', icon: '💊', label: 'Service', color: '#f59e0b' },
-  { key: 'autre', icon: '🏪', label: 'Autre', color: '#6b7280' },
 ] as const;
+
+const VISIBLE_CATEGORIES = new Set(['restaurant', 'hotel']);
+
+function keepVisible(p: Place): boolean {
+  return p.category != null && VISIBLE_CATEGORIES.has(p.category);
+}
 
 type CategoryKey = (typeof CATEGORY_CONFIG)[number]['key'];
 
@@ -124,10 +126,11 @@ export default function PlacesScreen({ onSelectPlace }: PlacesScreenProps) {
           category: category || 'all',
         });
         if (cancelled) return;
-        setPlaces(result.places);
+        const filtered = result.places.filter(keepVisible);
+        setPlaces(filtered);
         setSummary(result.summary);
         // Résultats → filtres repliés ; vide/erreur → formulaire déroulé.
-        setFiltersOpen(result.places.length === 0);
+        setFiltersOpen(filtered.length === 0);
       } catch (e) {
         if (cancelled) return;
         setSummary(e instanceof Error ? e.message : 'Erreur');
@@ -154,10 +157,11 @@ export default function PlacesScreen({ onSelectPlace }: PlacesScreenProps) {
         locationName: opts?.reset ? undefined : locationName.trim() || undefined,
         searchQuery: opts?.reset ? undefined : searchQuery.trim() || undefined,
       });
-      setPlaces(result.places);
+      const filtered = result.places.filter(keepVisible);
+      setPlaces(filtered);
       setSummary(result.summary);
       // Nouvelle recherche validée → replier si résultats, dérouler sinon.
-      setFiltersOpen(result.places.length === 0);
+      setFiltersOpen(filtered.length === 0);
     } catch (e) {
       setSummary(e instanceof Error ? e.message : 'Erreur');
       setPlaces([]);
@@ -188,10 +192,11 @@ export default function PlacesScreen({ onSelectPlace }: PlacesScreenProps) {
     setLoading(true);
     try {
       const result = await api.fetchNearby(lat, lng, 5000);
-      setPlaces(result.places ?? []);
+      const filtered = (result.places ?? []).filter(keepVisible);
+      setPlaces(filtered);
       setSummary('Lieux autour de vous (rayon 5 km)');
       setViewMode('list');
-      setFiltersOpen((result.places ?? []).length === 0);
+      setFiltersOpen(filtered.length === 0);
     } catch (e) {
       setPlaces([]);
       setSummary(e instanceof Error ? e.message : 'Erreur');
