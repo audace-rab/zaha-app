@@ -333,9 +333,14 @@ function PostCard({
   onRefreshFeed: () => void;
 }) {
   const [showAllComments, setShowAllComments] = useState(false);
+  const [commentsExpanded, setCommentsExpanded] = useState(false);
   const [commentDraft, setCommentDraft] = useState('');
   const [sendingComment, setSendingComment] = useState(false);
   const [comments, setComments] = useState<Comment[]>(item.commentsList ?? []);
+
+  const toggleComments = () => {
+    setCommentsExpanded((prev) => !prev);
+  };
 
   const refreshComments = async () => {
     try {
@@ -437,66 +442,79 @@ function PostCard({
           <Text style={styles.likeIcon}>{item.hasLiked ? '\u2764\uFE0F' : '\uD83E\uDD0D'}</Text>
           <Text style={[styles.likeCount, item.hasLiked && styles.likeCountActive]}>{item.likes}</Text>
         </TouchableOpacity>
-        <View style={styles.commentButton}>
-          <Text style={styles.commentCountIcon}>💬</Text>
+        <TouchableOpacity
+          style={styles.commentButton}
+          onPress={toggleComments}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          accessibilityRole="button"
+          accessibilityLabel={commentsExpanded ? 'Masquer les commentaires' : 'Voir les commentaires'}
+          accessibilityState={{ expanded: commentsExpanded }}
+        >
+          <Text style={[styles.commentCountIcon, commentsExpanded && styles.commentCountIconActive]}>💬</Text>
           <Text style={styles.commentCount}>{comments.length}</Text>
-        </View>
+        </TouchableOpacity>
       </View>
 
       {/* Commentaires */}
-      {visibleComments.length > 0 && (
-        <View style={styles.commentsSection}>
-          {visibleComments.map((c) => {
-            const isMine = c.author_id === currentUserId;
-            return (
-              <TouchableOpacity
-                key={c.id}
-                style={styles.commentRow}
-                onLongPress={() => isMine && handleDeleteComment(c)}
-                delayLongPress={400}
-                accessibilityRole="button"
-                accessibilityLabel={isMine ? 'Commentaire, appui long pour supprimer' : `Commentaire de ${c.author?.name ?? ''}`}
-                disabled={!isMine}
-              >
-                <View style={styles.commentBubble}>
-                  <Text style={styles.commentAuthor}>
-                    {c.author?.name ?? c.author_name ?? 'Anonyme'}
-                    {isMine ? ' · toi' : ''}
-                  </Text>
-                  <Text style={styles.commentText}>{c.text}</Text>
-                </View>
+      {commentsExpanded && (
+        <>
+        {visibleComments.length > 0 && (
+          <ScrollView style={styles.commentsScroll} nestedScrollEnabled>
+            <View style={styles.commentsSection}>
+            {visibleComments.map((c) => {
+              const isMine = c.author_id === currentUserId;
+              return (
+                <TouchableOpacity
+                  key={c.id}
+                  style={styles.commentRow}
+                  onLongPress={() => isMine && handleDeleteComment(c)}
+                  delayLongPress={400}
+                  accessibilityRole="button"
+                  accessibilityLabel={isMine ? 'Commentaire, appui long pour supprimer' : `Commentaire de ${c.author?.name ?? ''}`}
+                  disabled={!isMine}
+                >
+                  <View style={styles.commentBubble}>
+                    <Text style={styles.commentAuthor}>
+                      {c.author?.name ?? c.author_name ?? 'Anonyme'}
+                      {isMine ? ' · toi' : ''}
+                    </Text>
+                    <Text style={styles.commentText}>{c.text}</Text>
+                  </View>
+                </TouchableOpacity>
+              );
+            })}
+            {hiddenCount > 0 && (
+              <TouchableOpacity onPress={() => setShowAllComments(true)} accessibilityRole="button" accessibilityLabel={`Voir les ${hiddenCount} autres commentaires`}>
+                <Text style={styles.viewAllText}>
+                  Voir les {hiddenCount} autre{hiddenCount > 1 ? 's' : ''} commentaire{hiddenCount > 1 ? 's' : ''}...
+                </Text>
               </TouchableOpacity>
-            );
-          })}
-          {hiddenCount > 0 && (
-            <TouchableOpacity onPress={() => setShowAllComments(true)} accessibilityRole="button" accessibilityLabel={`Voir les ${hiddenCount} autres commentaires`}>
-              <Text style={styles.viewAllText}>
-                Voir les {hiddenCount} autre{hiddenCount > 1 ? 's' : ''} commentaire{hiddenCount > 1 ? 's' : ''}...
-              </Text>
-            </TouchableOpacity>
-          )}
-        </View>
-      )}
+            )}
+            </View>
+          </ScrollView>
+        )}
 
-      {/* Input commentaire */}
-      <View style={styles.commentInputRow}>
-        <TextInput
-          style={styles.commentInput}
-          value={commentDraft}
-          onChangeText={setCommentDraft}
-          placeholder="Écrire un commentaire..."
-          placeholderTextColor="#9ca3af"
-        />
-        <TouchableOpacity
-          style={[styles.commentSubmit, (!commentDraft.trim() || sendingComment) && styles.commentSubmitDisabled]}
-          onPress={handleAddComment}
-          disabled={!commentDraft.trim() || sendingComment}
-          accessibilityRole="button"
-          accessibilityLabel="Publier le commentaire"
-        >
-          {sendingComment ? <ActivityIndicator size="small" color="#fff" /> : <Text style={styles.commentSubmitText}>Publier</Text>}
-        </TouchableOpacity>
-      </View>
+        {/* Input commentaire */}
+        <View style={styles.commentInputRow}>
+          <TextInput
+            style={styles.commentInput}
+            value={commentDraft}
+            onChangeText={setCommentDraft}
+            placeholder="Écrire un commentaire..."
+            placeholderTextColor="#9ca3af"
+          />
+          <TouchableOpacity
+            style={[styles.commentSubmit, (!commentDraft.trim() || sendingComment) && styles.commentSubmitDisabled]}
+            onPress={handleAddComment}
+            disabled={!commentDraft.trim() || sendingComment}
+            accessibilityRole="button"
+            accessibilityLabel="Publier le commentaire"
+          >
+            {sendingComment ? <ActivityIndicator size="small" color="#fff" /> : <Text style={styles.commentSubmitText}>Publier</Text>}
+          </TouchableOpacity>
+        </View>
+        </>
+      )}
     </View>
   );
 }
@@ -604,10 +622,12 @@ const styles = StyleSheet.create({
   likeCountActive: { color: '#ef4444' },
   commentButton: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   commentCountIcon: { fontSize: 16 },
+  commentCountIconActive: { color: '#2563eb' },
   commentCount: { color: '#6b7280', fontSize: 14, fontWeight: '600' },
 
   // Comments
-  commentsSection: { paddingHorizontal: 12, paddingBottom: 4, gap: 6 },
+  commentsScroll: { maxHeight: 220 },
+  commentsSection: { paddingHorizontal: 12, paddingVertical: 10, gap: 6 },
   commentRow: { flexDirection: 'row' },
   commentBubble: {
     backgroundColor: '#f3f4f6',
