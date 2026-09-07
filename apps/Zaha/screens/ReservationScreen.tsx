@@ -22,20 +22,30 @@ type PlaceMini = {
   address?: string;
 };
 
+type ReservationType = 'table' | 'hotel' | 'activity' | 'general';
+
 type ReservationScreenProps = {
   place: PlaceMini;
   onDone: () => void;
 };
 
-const RESERVATION_TYPES = [
-  { key: 'general', label: 'Général', icon: '📋' },
-  { key: 'table', label: 'Table', icon: '🍽️' },
-  { key: 'hotel', label: 'Hôtel', icon: '🏨' },
-  { key: 'activity', label: 'Activité', icon: '🎭' },
-] as const;
-
 const ROOM_TYPES = ['Simple', 'Double', 'Suite', 'Familiale'];
 const ACTIVITY_SLOTS = ['Matin', 'Après-midi', 'Journée complète'];
+
+const TYPE_INFO: Record<ReservationType, { label: string; icon: string }> = {
+  table: { label: 'Réservation de table', icon: '🍽️' },
+  hotel: { label: 'Réservation d\'hôtel', icon: '🏨' },
+  activity: { label: 'Réservation d\'activité', icon: '🎭' },
+  general: { label: 'Réservation', icon: '📋' },
+};
+
+function deriveType(category?: string): ReservationType {
+  const c = (category ?? '').toLowerCase();
+  if (c === 'restaurant') return 'table';
+  if (c === 'hotel') return 'hotel';
+  if (['nature', 'activités', 'activité', 'attraction'].includes(c)) return 'activity';
+  return 'general';
+}
 
 const formatDateISO = (d: Date) =>
   `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
@@ -50,7 +60,7 @@ const today = new Date();
 
 export default function ReservationScreen({ place, onDone }: ReservationScreenProps) {
   const [currentUserId, setCurrentUserId] = useState<string>(DEMO_USER_ID);
-  const [reservationType, setReservationType] = useState<string>('general');
+  const reservationType = deriveType(place.category);
 
   const [dateObj, setDateObj] = useState<Date>(today);
   const [showDatePicker, setShowDatePicker] = useState(false);
@@ -130,24 +140,10 @@ export default function ReservationScreen({ place, onDone }: ReservationScreenPr
       <Text style={styles.placeName}>📍 {place.name}</Text>
       {place.address ? <Text style={styles.placeAddress}>{place.address}</Text> : null}
 
-      {/* Type de réservation */}
-      <Text style={styles.label}>Type de réservation</Text>
-      <View style={styles.typeRow}>
-        {RESERVATION_TYPES.map((t) => (
-          <TouchableOpacity
-            key={t.key}
-            style={[styles.typeChip, reservationType === t.key && styles.typeChipActive]}
-            onPress={() => setReservationType(t.key)}
-            accessibilityRole="button"
-            accessibilityLabel={`Type : ${t.label}`}
-            accessibilityState={{ selected: reservationType === t.key }}
-          >
-            <Text style={styles.typeChipIcon}>{t.icon}</Text>
-            <Text style={[styles.typeChipText, reservationType === t.key && styles.typeChipTextActive]}>
-              {t.label}
-            </Text>
-          </TouchableOpacity>
-        ))}
+      {/* Type dérivé (lecture seule) */}
+      <View style={styles.typeBadge}>
+        <Text style={styles.typeBadgeIcon}>{TYPE_INFO[reservationType].icon}</Text>
+        <Text style={styles.typeBadgeText}>{TYPE_INFO[reservationType].label}</Text>
       </View>
 
       {/* Date */}
@@ -294,6 +290,21 @@ const styles = StyleSheet.create({
   placeName: { fontSize: 18, fontWeight: '700', color: '#111827', marginBottom: 2 },
   placeAddress: { color: '#6b7280', fontSize: 14, marginBottom: 12 },
   label: { fontSize: 14, fontWeight: '600', color: '#374151', marginTop: 12, marginBottom: 6 },
+  typeBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 20,
+    backgroundColor: '#eff6ff',
+    borderWidth: 1,
+    borderColor: '#bfdbfe',
+    marginBottom: 4,
+  },
+  typeBadgeIcon: { fontSize: 14 },
+  typeBadgeText: { fontSize: 13, color: '#1d4ed8', fontWeight: '600' },
   input: {
     borderWidth: 1,
     borderColor: '#d1d5db',

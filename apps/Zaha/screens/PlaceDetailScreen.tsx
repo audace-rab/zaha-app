@@ -23,6 +23,7 @@ const DEMO_USER_ID = 'a1000000-0000-0000-0000-000000000001';
 type Place = {
   id: string;
   name: string;
+  category?: string;
   rating?: number;
   address?: string;
   snippet?: string;
@@ -227,7 +228,7 @@ export default function PlaceDetailScreen({ place }: PlaceDetailScreenProps) {
       {showReservation && place ? (
         <View style={styles.reservationOverlay}>
           <ReservationScreen
-            place={{ id: place.id, name: place.name, address: place.address }}
+            place={{ id: place.id, name: place.name, category: place.category, address: place.address }}
             onDone={() => setShowReservation(false)}
           />
         </View>

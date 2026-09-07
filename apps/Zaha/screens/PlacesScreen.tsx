@@ -391,6 +391,7 @@ export default function PlacesScreen({ onSelectPlace }: PlacesScreenProps) {
                 onSelectPlace?.({
                   id: selectedOnMap.id,
                   name: selectedOnMap.name,
+                  category: selectedOnMap.category,
                   address: selectedOnMap.address,
                   photoUrl: selectedOnMap.photoUrl,
                   isPro: selectedOnMap.isPro,
@@ -515,7 +516,7 @@ const styles = StyleSheet.create({
   actionsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 12 },
   mapToggleActive: { backgroundColor: '#2563eb' },
   mapToggleActiveText: { color: '#fff' },
-  chipsRow: { gap: 10, marginBottom: 12, paddingVertical: 4 },
+  chipsRow: { gap: 10, marginBottom: 30, paddingVertical: 4 },
   chip: {
     flexDirection: 'row',
     alignItems: 'center',

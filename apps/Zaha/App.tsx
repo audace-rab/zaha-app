@@ -15,6 +15,7 @@ type Tab = 'feed' | 'places' | 'chat' | 'profile';
 type SelectedPlace = {
   id: string;
   name: string;
+  category?: string;
   rating?: number;
   address?: string;
   snippet?: string;
