@@ -553,30 +553,11 @@ insert into public.places (
   rating, latitude, longitude, google_maps_uri, photo_url, is_pro, city_id
 )
 values
-  -- --- Lieux emblématiques (ex-seed_places.sql ; les 2 lieux parisiens ont été remplacés par des lieux malgaches) ---
-  (
-    'attraction-allee-des-baobabs', 'Allée des Baobabs', 'activités', 'attraction',
-    'RN8 entre Morondava et Belo-sur-Tsiribihina, Menabe',
-    'Avenue majestueuse de baobabs centenaires, spectaculaire au coucher du soleil.',
-    'Ouvert 24h/24', 4.9, -20.2504811, 44.4196950,
-    'https://maps.google.com/?q=Allee+des+Baobabs+Morondava',
-    'https://images.unsplash.com/photo-1469854523086-cc02fe5d8800?w=800&q=80',
-    false, 'c1000000-0000-0000-0000-000000000007'
-  ),
-  (
-    'attraction-plage-de-ramena', 'Plage de Ramena', 'activités', 'attraction',
-    'Ramena, Antsiranana (Diego Suarez)',
-    'Lagon turquoise et pirogues à voile à une trentaine de minutes de Diego Suarez.',
-    'Ouvert 24h/24', 4.7, -12.2494307, 49.3414343,
-    'https://maps.google.com/?q=Plage+de+Ramena+Antsiranana',
-    'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=800&q=80',
-    false, 'c1000000-0000-0000-0000-000000000005'
-  ),
   (
     'restaurant-la-varangue', 'La Varangue', 'restaurant', 'restaurant',
     'Rue Printsy Ratsimamanga, Isoraka, Antananarivo',
     'Restaurant gastronomique renommé proposant des saveurs malgaches et françaises.',
-    '12:00 - 22:00', 4.8, -18.9118862, 47.5250393,
+    '12:00 - 22:00', 4.8, -18.9119145, 47.5249725, 
     'https://maps.google.com/?q=La+Varangue+Antananarivo',
     'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=800&q=80',
     true, 'c1000000-0000-0000-0000-000000000001'
@@ -585,7 +566,7 @@ values
     'hotel-carlton-madagascar', 'Hôtel Carlton Madagascar', 'hotel', 'hotel',
     'Anosy, Antananarivo 101',
     'Hôtel 5 étoiles emblématique surplombant le lac Anosy.',
-    'Ouvert 24h/24', 4.7, -18.9148484, 47.5178489,
+    'Ouvert 24h/24', 4.7, -18.9147088, 47.5178248,
     'https://maps.google.com/?q=Carlton+Hotel+Antananarivo',
     'https://images.unsplash.com/photo-1566073771259-6a8506099945?w=800&q=80',
     true, 'c1000000-0000-0000-0000-000000000001'
@@ -595,7 +576,7 @@ values
     'restaurant-le-marais', 'Le Marais', 'restaurant', 'restaurant',
     'Ankorondrano, Antananarivo',
     'Cuisine raffinée et vue panoramique sur la ville avec une carte de cocktails créatifs.',
-    '11:30 - 23:00', 4.7, -18.8873568, 47.5235411,
+    '11:30 - 23:00', 4.7, -18.8873638, 47.5234756,
     'https://maps.google.com/?q=Le+Marais+Antananarivo',
     'https://images.unsplash.com/photo-1552566626-52f8b828add9?w=800&q=80',
     true, 'c1000000-0000-0000-0000-000000000001'
@@ -604,7 +585,7 @@ values
     'restaurant-cafe-de-la-gare', 'Café de la Gare', 'restaurant', 'restaurant',
     'Gare Soarano, Analakely, Antananarivo',
     'Brasserie historique au cœur de la gare rénovée, réputée pour ses steaks de zébu et son ambiance.',
-    '07:00 - 22:30', 4.6, -18.9035523, 47.5207223,
+    '07:00 - 22:30', 4.6, -18.9035370, 47.5208116, 
     'https://maps.google.com/?q=Cafe+de+la+Gare+Antananarivo',
     'https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=800&q=80',
     false, 'c1000000-0000-0000-0000-000000000001'
@@ -613,7 +594,7 @@ values
     'restaurant-sakamanga', 'Sakamanga Restaurant', 'restaurant', 'restaurant',
     'Rue Ratianarivo, Isoraka, Antananarivo',
     'Institution incontournable offrant des plats traditionnels et internationaux au milieu de pièces de musée.',
-    '06:30 - 22:00', 4.5, -18.9081875, 47.5211719,
+    '06:30 - 22:00', 4.5, -18.9082451, 47.5213083,
     'https://maps.google.com/?q=Sakamanga+Antananarivo',
     'https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=800&q=80',
     true, 'c1000000-0000-0000-0000-000000000001'
@@ -623,7 +604,7 @@ values
     'hotel-radisson-blu-waterfront', 'Radisson Blu Hotel Waterfront', 'hotel', 'hotel',
     'Zone Tana Waterfront, Ambodivona, Antananarivo',
     'Design moderne au bord de l''eau, chambres spacieuses et centre de remise en forme.',
-    'Ouvert 24h/24', 4.8, -18.8902563, 47.5246662,
+    'Ouvert 24h/24', 4.8, -18.8902914, 47.5245160, 
     'https://maps.google.com/?q=Radisson+Blu+Antananarivo',
     'https://images.unsplash.com/photo-1582719508461-905c673771fd?w=800&q=80',
     true, 'c1000000-0000-0000-0000-000000000001'
@@ -632,65 +613,9 @@ values
     'hotel-sakamanga', 'Hôtel Sakamanga', 'hotel', 'hotel',
     'Isoraka, Antananarivo',
     'Hôtel de charme chaleureux et artistique avec terrasse verdoyante et piscine.',
-    'Ouvert 24h/24', 4.6, -18.9083700, 47.5212480,
+    'Ouvert 24h/24', 4.6, -18.9082451, 47.5213083, 
     'https://maps.google.com/?q=Hotel+Sakamanga+Antananarivo',
     'https://images.unsplash.com/photo-1520250497591-112f2f40a3f4?w=800&q=80',
-    false, 'c1000000-0000-0000-0000-000000000001'
-  ),
-  -- --- Depuis FALLBACK_PLACES legacy : activités ---
-  (
-    'attraction-rova-manjakamiadana', 'Rova de Manjakamiadana (Palais de la Reine)', 'activités', 'attraction',
-    'Haute Ville, Antananarivo',
-    'Monument historique majeur offrant une vue panoramique à 360 degrés sur toute la capitale.',
-    '08:30 - 17:00', 4.8, -18.9237141, 47.5320673,
-    'https://maps.google.com/?q=Rova+de+Manjakamiadana',
-    'https://images.unsplash.com/photo-1533105079780-92b9be482077?w=800&q=80',
-    true, 'c1000000-0000-0000-0000-000000000001'
-  ),
-  (
-    'attraction-parc-tsimbazaza', 'Parc Zoologique et Botanique de Tsimbazaza', 'activités', 'attraction',
-    'Rue Kasanga Fernand, Tsimbazaza, Antananarivo',
-    'Découverte de la faune et de la flore uniques de Madagascar, y compris de nombreuses espèces de lémuriens.',
-    '09:00 - 17:00', 4.4, -18.9303365, 47.5277513,
-    'https://maps.google.com/?q=Parc+Tsimbazaza+Antananarivo',
-    'https://images.unsplash.com/photo-1540555700478-4be289fbecef?w=800&q=80',
-    false, 'c1000000-0000-0000-0000-000000000001'
-  ),
-  (
-    'attraction-lemurs-park', 'Lemurs'' Park', 'activités', 'attraction',
-    'Katsaoka, RN1 (à 22km d''Antananarivo)',
-    'Réserve naturelle privée abritant 9 espèces de lémuriens en liberté au bord de la rivière Katsaoka.',
-    '08:30 - 16:00', 4.7, -18.9526685, 47.3580533,
-    'https://maps.google.com/?q=Lemurs+Park+Madagascar',
-    'https://images.unsplash.com/photo-1574063413132-355dbfd83e0c?w=800&q=80',
-    true, 'c1000000-0000-0000-0000-000000000001'
-  ),
-  -- --- Depuis FALLBACK_PLACES legacy : pharmacies ---
-  (
-    'pharmacie-isoraka', 'Pharmacie d''Isoraka', 'pharmacie', 'pharmacie',
-    'Rue Rainitovo, Isoraka, Antananarivo',
-    'Pharmacie centrale proposant un grand choix de médicaments et produits de parapharmacie.',
-    '07:30 - 20:00', 4.6, -18.9107613, 47.5218475,
-    'https://maps.google.com/?q=Pharmacie+Isoraka+Antananarivo',
-    'https://images.unsplash.com/photo-1586015555751-63bb77f4322a?w=800&q=80',
-    false, 'c1000000-0000-0000-0000-000000000001'
-  ),
-  (
-    'pharmacie-metropole', 'Pharmacie Métropole', 'pharmacie', 'pharmacie',
-    'Avenue de l''Indépendance, Analakely, Antananarivo',
-    'Pharmacie de référence au centre-ville avec service de garde régulier.',
-    'Ouvert 24h/24', 4.5, -18.9106604, 47.5259774,
-    'https://maps.google.com/?q=Pharmacie+Metropole+Antananarivo',
-    'https://images.unsplash.com/photo-1576602976047-174e57a47881?w=800&q=80',
-    false, 'c1000000-0000-0000-0000-000000000001'
-  ),
-  (
-    'pharmacie-ankorondrano', 'Pharmacie Ankorondrano', 'pharmacie', 'pharmacie',
-    'Boulevard de Tokyo, Ankorondrano, Antananarivo',
-    'Pharmacie moderne ouverte 7j/7 proche des grands centres commerciaux.',
-    '08:00 - 21:00', 4.7, -18.8830368, 47.5251797,
-    'https://maps.google.com/?q=Pharmacie+Ankorondrano',
-    'https://images.unsplash.com/photo-1631549916768-4119b2e5f926?w=800&q=80',
     false, 'c1000000-0000-0000-0000-000000000001'
   )
 on conflict (external_id) do update set
@@ -707,28 +632,6 @@ on conflict (external_id) do update set
   photo_url = excluded.photo_url,
   is_pro = excluded.is_pro,
   city_id = excluded.city_id;
-
--- ============================================================================
--- 8.1 MISE A JOUR DES COORDONNEES REELLES (idempotent)
---    Ré-exécuter le fichier corrige aussi les lignes déjà présentes en base.
---    Positions réelles connues des POI (précision ~10-100 m). Clé stable :
---    external_id (le nom peut évoluer, pas l'identifiant).
--- ============================================================================
-update public.places set latitude = -18.9112, longitude = 47.5258 where external_id = 'restaurant-la-varangue';        -- La Varangue, Antaninarenina
-update public.places set latitude = -18.9287, longitude = 47.5183 where external_id = 'hotel-carlton-madagascar';      -- Hôtel Carlton, lac Anosy
-update public.places set latitude = -20.2506, longitude = 44.4183 where external_id = 'attraction-allee-des-baobabs';  -- Morondava, Menabe
-update public.places set latitude = -12.2680, longitude = 49.3930 where external_id = 'attraction-plage-de-ramena';    -- Antsiranana
-update public.places set latitude = -18.8815, longitude = 47.5230 where external_id = 'restaurant-le-marais';          -- Ankorondrano
-update public.places set latitude = -18.9076, longitude = 47.5212 where external_id = 'restaurant-cafe-de-la-gare';    -- Gare Soarano, Analakely
-update public.places set latitude = -18.9121, longitude = 47.5224 where external_id = 'restaurant-sakamanga';          -- Rue Ratianarivo, Isoraka
-update public.places set latitude = -18.9047, longitude = 47.5290 where external_id = 'hotel-radisson-blu-waterfront'; -- Tana Waterfront, Ambodivona
-update public.places set latitude = -18.9126, longitude = 47.5210 where external_id = 'hotel-sakamanga';               -- Isoraka
-update public.places set latitude = -18.9235, longitude = 47.5285 where external_id = 'attraction-rova-manjakamiadana'; -- Rova Manjakamiadana
-update public.places set latitude = -18.9452, longitude = 47.5317 where external_id = 'attraction-parc-tsimbazaza';    -- Rue Kasanga Fernand
-update public.places set latitude = -18.9537, longitude = 47.3701 where external_id = 'attraction-lemurs-park';        -- RN1 Katsaoka (~22 km ouest)
-update public.places set latitude = -18.9138, longitude = 47.5207 where external_id = 'pharmacie-isoraka';             -- Rue Rainitovo, Isoraka
-update public.places set latitude = -18.9062, longitude = 47.5240 where external_id = 'pharmacie-metropole';           -- Av. de la République, Analakely
-update public.places set latitude = -18.8798, longitude = 47.5209 where external_id = 'pharmacie-ankorondrano';        -- Bd de Tokyo, Ankorondrano
 
 -- ============================================================================
 -- 9. SEED DÉMO FEED : auteurs, posts, médias, likes, commentaires
