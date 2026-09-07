@@ -501,7 +501,7 @@ export async function searchNearbyPlaces(
       places: sortByProximity(dbResult.places, coords),
       summary: dbResult.summary,
     };
-    await cacheSet(cacheKey, result, 60);
+    await cacheSet(cacheKey, result, 2);
     return result;
   }
 
