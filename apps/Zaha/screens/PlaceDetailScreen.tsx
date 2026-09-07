@@ -316,6 +316,15 @@ export default function PlaceDetailScreen({ place }: PlaceDetailScreenProps) {
         {place.phoneNumber ? <Text style={styles.line}>📞 {place.phoneNumber}</Text> : null}
         {place.snippet ? <Text style={styles.snippet}>{place.snippet}</Text> : null}
 
+        <TouchableOpacity
+          style={styles.reserveButton}
+          onPress={() => setShowReservation(true)}
+          accessibilityRole="button"
+          accessibilityLabel="Réserver ce lieu"
+        >
+          <Text style={styles.reserveButtonText}>📅 Réserver</Text>
+        </TouchableOpacity>
+
         <View style={styles.actionsRow}>
           {place.location && (
             <TouchableOpacity
@@ -362,18 +371,10 @@ export default function PlaceDetailScreen({ place }: PlaceDetailScreenProps) {
               adjustsFontSizeToFit
               minimumFontScale={0.8}
             >
-              🔗 Partager
+              📤 Partager
             </Text>
           </TouchableOpacity>
         </View>
-        <TouchableOpacity
-          style={styles.reserveButton}
-          onPress={() => setShowReservation(true)}
-          accessibilityRole="button"
-          accessibilityLabel="Réserver ce lieu"
-        >
-          <Text style={styles.reserveButtonText}>📅 Réserver</Text>
-        </TouchableOpacity>
 
         {showMap && place.location && (
           <MapView
@@ -597,7 +598,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: 8,
+    marginTop: 12,
   },
   reserveButtonText: { color: '#fff', fontWeight: '700', fontSize: 15 },
   bookmarkButtonActive: {
@@ -610,7 +611,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 8,
-    marginTop: 12,
+    marginTop: 8,
     alignItems: 'stretch',
   },
   actionButton: {
