@@ -1161,6 +1161,76 @@ values
     'a1000000-0000-0000-0000-000000000003',
     'Les lémuriens sont trop mignons, on y emmène les enfants ce week-end.',
     now() - interval '8 days'
+  ),
+  (
+    'd0000000-0000-0000-0000-000000000100',
+    'b0000000-0000-0000-0000-000000000001',
+    'a1000000-0000-0000-0000-000000000002',
+    'Quelle vue magnifique ! Je confirme, le Rova au matin c''est magique.',
+    now() - interval '10 days'
+  ),
+  (
+    'd0000000-0000-0000-0000-000000000101',
+    'b0000000-0000-0000-0000-000000000001',
+    'a1000000-0000-0000-0000-000000000003',
+    'J''adore cette photo, tu as pris ça avec quel téléphone ?',
+    now() - interval '9 days'
+  ),
+  (
+    'd0000000-0000-0000-0000-000000000102',
+    'b0000000-0000-0000-0000-000000000001',
+    'a1000000-0000-0000-0000-000000000001',
+    'Merci ! Oui prise au grand angle depuis les terrasses.',
+    now() - interval '9 days'
+  ),
+  (
+    'd0000000-0000-0000-0000-000000000103',
+    'b0000000-0000-0000-0000-000000000001',
+    'a1000000-0000-0000-0000-000000000002',
+    'Il faut y aller tôt le matin pour éviter la foule, conseil d''une habituée !',
+    now() - interval '8 days'
+  ),
+  (
+    'd0000000-0000-0000-0000-000000000104',
+    'b0000000-0000-0000-0000-000000000001',
+    'a1000000-0000-0000-0000-000000000003',
+    'Trop beau mada 🇲🇬 ça me manque déjà.',
+    now() - interval '7 days'
+  ),
+  (
+    'd0000000-0000-0000-0000-000000000105',
+    'b0000000-0000-0000-0000-000000000001',
+    'a1000000-0000-0000-0000-000000000002',
+    'On devrait organiser une sortie groupe là-bas samedi.',
+    now() - interval '6 days'
+  ),
+  (
+    'd0000000-0000-0000-0000-000000000106',
+    'b0000000-0000-0000-0000-000000000001',
+    'a1000000-0000-0000-0000-000000000001',
+    'Partant ! On se retrouve à 7h devant l''entrée.',
+    now() - interval '5 days'
+  ),
+  (
+    'd0000000-0000-0000-0000-000000000107',
+    'b0000000-0000-0000-0000-000000000001',
+    'a1000000-0000-0000-0000-000000000003',
+    'C''est noté, je ramène les samossas 😄',
+    now() - interval '4 days'
+  ),
+  (
+    'd0000000-0000-0000-0000-000000000108',
+    'b0000000-0000-0000-0000-000000000001',
+    'a1000000-0000-0000-0000-000000000002',
+    'Quel ciel bleu, on se croirait sur une carte postale.',
+    now() - interval '2 days'
+  ),
+  (
+    'd0000000-0000-0000-0000-000000000109',
+    'b0000000-0000-0000-0000-000000000001',
+    'a1000000-0000-0000-0000-000000000001',
+    'La vue sur Analakely de là-haut est imprenable, je recommande à 100% !',
+    now() - interval '1 day'
   )
 on conflict (id) do nothing;
 
