@@ -449,7 +449,12 @@ function PostCard({
           accessibilityLabel={item.hasLiked ? 'Retirer le j\u2019aime' : 'Aimer cette publication'}
           accessibilityState={{ selected: Boolean(item.hasLiked) }}
         >
-          <Text style={styles.likeIcon}>{item.hasLiked ? '\u2764\uFE0F' : '\uD83E\uDD0D'}</Text>
+          <FontIcon
+            name={item.hasLiked ? 'heart' : 'heart-outline'}
+            width={18}
+            height={18}
+            fill={item.hasLiked ? '#ef4444' : '#6b7280'}
+          />
           <Text style={[styles.likeCount, item.hasLiked && styles.likeCountActive]}>{item.likes}</Text>
         </TouchableOpacity>
         <TouchableOpacity
@@ -632,7 +637,6 @@ const styles = StyleSheet.create({
   content: { padding: 12, fontSize: 15, lineHeight: 22 },
   metaRow: { flexDirection: 'row', alignItems: 'center', gap: 16, paddingHorizontal: 12, paddingBottom: 12 },
   likeButton: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  likeIcon: { fontSize: 18 },
   likeCount: { color: '#6b7280', fontSize: 14, fontWeight: '600' },
   likeCountActive: { color: '#ef4444' },
   commentButton: { flexDirection: 'row', alignItems: 'center', gap: 6 },

@@ -4,6 +4,7 @@ import {
   BackHandler,
   FlatList,
   RefreshControl,
+  ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -96,7 +97,7 @@ export default function ReservationHistoryScreen({ onBack }: ReservationHistoryS
   const handleCancel = async (id: string) => {
     setCancellingId(id);
     try {
-      await api.cancelReservation(id);
+      await api.cancelReservation(id, currentUserId);
       setReservations((prev) =>
         prev.map((r) => (r.id === id ? { ...r, status: 'cancelled' as const } : r))
       );
@@ -110,14 +111,14 @@ export default function ReservationHistoryScreen({ onBack }: ReservationHistoryS
   return (
     <View style={styles.container}>
       {/* Filtres par statut */}
-      <FlatList
+      <ScrollView
         horizontal
-        data={STATUS_FILTERS}
-        keyExtractor={(item) => item.key}
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={styles.filtersRow}
-        renderItem={({ item }) => (
+      >
+        {STATUS_FILTERS.map((item) => (
           <TouchableOpacity
+            key={item.key}
             style={[styles.filterChip, filter === item.key && styles.filterChipActive]}
             onPress={() => setFilter(item.key)}
             accessibilityRole="button"
@@ -128,8 +129,8 @@ export default function ReservationHistoryScreen({ onBack }: ReservationHistoryS
               {item.label}
             </Text>
           </TouchableOpacity>
-        )}
-      />
+        ))}
+      </ScrollView>
 
       <FlatList
         data={reservations}
@@ -237,18 +238,19 @@ const styles = StyleSheet.create({
   filtersRow: { paddingHorizontal: 16, paddingVertical: 12, gap: 8 },
   filterChip: {
     paddingHorizontal: 16,
-    paddingVertical: 10,
+    paddingVertical: 8,
     borderRadius: 20,
     backgroundColor: '#f3f4f6',
     borderWidth: 1,
     borderColor: '#e5e7eb',
-    minHeight: 40,
+    minHeight: 36,
+    maxHeight : 36,
     justifyContent: 'center',
   },
   filterChipActive: { backgroundColor: '#2563eb', borderColor: '#2563eb' },
   filterText: { fontSize: 13, color: '#374151', fontWeight: '500' },
   filterTextActive: { color: '#fff' },
-  list: { padding: 16, paddingBottom: 40, alignItems: 'flex-start' },
+  list: { justifyContent: 'flex-start', paddingTop: 0, paddingHorizontal: 16, paddingBottom: 40 },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingVertical: 60 },
   emptyState: { alignItems: 'center', paddingVertical: 60, paddingHorizontal: 24 },
   emptyIcon: { alignItems: 'center', justifyContent: 'center', marginBottom: 12 },

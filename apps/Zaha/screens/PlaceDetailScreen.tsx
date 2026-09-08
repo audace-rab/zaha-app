@@ -304,13 +304,15 @@ export default function PlaceDetailScreen({ place }: PlaceDetailScreenProps) {
 
         {place.address && (place.googleMapsUri || place.location) ? (
           <TouchableOpacity
+            style={styles.mapsButton}
             onPress={openInMaps}
             accessibilityRole="link"
             accessibilityLabel="Ouvrir dans Google Maps"
           >
-            <Text style={[styles.line, styles.addressLink]}>
-              {place.address} ↗
-            </Text>
+            <View style={styles.iconButtonContent}>
+              <FontIcon name="globe" width={16} height={16} fill="#2563eb" />
+              <Text style={styles.mapsButtonText}>Ouvrir dans Google Maps</Text>
+            </View>
           </TouchableOpacity>
         ) : place.address ? (
           <Text style={styles.line}>{place.address}</Text>
@@ -661,7 +663,16 @@ const styles = StyleSheet.create({
   rating: { color: '#ca8a04', fontWeight: '700', fontSize: 16 },
   line: { color: '#374151', fontSize: 15 },
   lineIconRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  addressLink: { textDecorationLine: 'underline' },
+  mapsButton: {
+    backgroundColor: '#f0f9ff',
+    borderWidth: 1,
+    borderColor: '#bfdbfe',
+    borderRadius: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    alignItems: 'center',
+  },
+  mapsButtonText: { color: '#2563eb', fontWeight: '600', fontSize: 14 },
   snippet: { color: '#6b7280', fontSize: 15, lineHeight: 22, marginTop: 4 },
   mapButtonText: { color: '#2563eb', fontWeight: '600', fontSize: 13, flexShrink: 1 },
   mapButtonTextActive: { color: '#2563eb', fontWeight: '700' },

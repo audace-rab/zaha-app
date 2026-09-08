@@ -3,6 +3,8 @@ import {
   ActivityIndicator,
   FlatList,
   Image,
+  PermissionsAndroid,
+  Platform,
   RefreshControl,
   ScrollView,
   StyleSheet,
@@ -190,14 +192,30 @@ export default function PlacesScreen({ onSelectPlace }: PlacesScreenProps) {
     }
   };
 
-  // « Autour de moi » : demande la position GPS puis lance la recherche nearby.
-  const handleNearby = () => {
+  // « Autour de moi » : demande la permission de localisation puis lance la recherche nearby.
+  const handleNearby = async () => {
     setNearbyError(null);
     try {
-      // Demande d'autorisation iOS (no-op sur Android, géré par le manifeste).
-      Geolocation.requestAuthorization(() => {}, () => {});
+      if (Platform.OS === 'android') {
+        const result = await PermissionsAndroid.request(
+          PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
+          {
+            title: 'Permission de localisation',
+            message: 'Zaha a besoin de votre position pour trouver les lieux autour de vous.',
+            buttonPositive: 'Autoriser',
+            buttonNegative: 'Refuser',
+          }
+        );
+        if (result !== PermissionsAndroid.RESULTS.GRANTED) {
+          setNearbyError('Permission de localisation refusée. Autorisez-la dans les réglages.');
+          return;
+        }
+      } else {
+        // iOS : la lib gère la demande système.
+        Geolocation.requestAuthorization(() => {}, () => {});
+      }
     } catch {
-      // Certaines plateformes ne l'exposent pas — non bloquant.
+      // Certaines plateformes n'exposent pas la demande — non bloquant.
     }
     Geolocation.getCurrentPosition(
       (position) => {
@@ -257,7 +275,12 @@ export default function PlacesScreen({ onSelectPlace }: PlacesScreenProps) {
               accessibilityLabel="Toutes les catégories"
               accessibilityState={{ selected: category === '' }}
             >
-              <FontIcon name="globe" width={18} height={18} fill="#374151" />
+              <FontIcon
+                name="globe"
+                width={18}
+                height={18}
+                fill={category === '' ? '#fff' : '#374151'}
+              />
               <Text style={[styles.chipText, category === '' && styles.chipTextActive]}>Tous</Text>
             </TouchableOpacity>
             {CATEGORY_CONFIG.map((cat) => (
@@ -272,7 +295,12 @@ export default function PlacesScreen({ onSelectPlace }: PlacesScreenProps) {
                 accessibilityLabel={`Filtrer par catégorie : ${cat.label}`}
                 accessibilityState={{ selected: category === cat.key }}
               >
-                <FontIcon name={cat.icon} width={18} height={18} fill="#374151" />
+                <FontIcon
+                  name={cat.icon}
+                  width={18}
+                  height={18}
+                  fill={category === cat.key ? '#fff' : '#374151'}
+                />
                 <Text style={[styles.chipText, category === cat.key && styles.chipTextActive]}>
                   {cat.label}
                 </Text>

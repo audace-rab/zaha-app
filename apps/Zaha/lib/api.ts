@@ -399,9 +399,11 @@ export const api = {
   getReservation: (id: string) =>
     apiFetch<{ reservation: Reservation }>(`/api/reservations/${id}`),
 
-  cancelReservation: (id: string) =>
+  cancelReservation: (id: string, userId: string) =>
     apiFetch<{ reservation: Reservation }>(`/api/reservations/${id}`, {
       method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId }),
     }),
 
   updateReservation: (id: string, data: Partial<CreateReservationData>) =>
