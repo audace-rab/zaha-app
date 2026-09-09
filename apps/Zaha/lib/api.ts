@@ -238,6 +238,13 @@ export const api = {
       body: JSON.stringify({ authorId }),
     }),
 
+  deletePost: (id: string, userId: string) =>
+    apiFetch<{ deleted: boolean }>(`/api/posts/${id}`, {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId }),
+    }),
+
   searchPlaces: (body: PlacesSearchRequest) =>
     apiFetch<PlacesSearchResponse>('/api/places/search', {
       method: 'POST',

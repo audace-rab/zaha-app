@@ -16,6 +16,7 @@ import {
 import Geolocation from '@react-native-community/geolocation';
 import { api } from '../lib/api';
 import FontIcon, { type FontIconName } from '../components/FontIcon';
+import { colors, radius } from '../theme';
 
 type Place = {
   id: string;
@@ -56,8 +57,8 @@ type PlacesScreenProps = {
 };
 
 const CATEGORY_CONFIG = [
-  { key: 'restaurant', icon: 'utensils', label: 'Restaurant', color: '#ef4444' },
-  { key: 'hotel', icon: 'bed', label: 'Hôtel', color: '#2563eb' },
+  { key: 'restaurant', icon: 'utensils', label: 'Restaurant', color: colors.like },
+  { key: 'hotel', icon: 'bed', label: 'Hôtel', color: colors.primary },
 ] as const;
 
 const VISIBLE_CATEGORIES = new Set(['restaurant', 'hotel']);
@@ -120,7 +121,8 @@ export default function PlacesScreen({ onSelectPlace }: PlacesScreenProps) {
         setFiltersOpen(filtered.length === 0);
       } catch (e) {
         if (cancelled) return;
-        setSummary(e instanceof Error ? e.message : 'Erreur');
+        console.warn('Erreur chargement des lieux :', e);
+        setSummary('Impossible de charger les lieux. Vérifiez votre connexion puis réessayez.');
         setPlaces([]);
         setFiltersOpen(true);
       } finally {
@@ -150,7 +152,8 @@ export default function PlacesScreen({ onSelectPlace }: PlacesScreenProps) {
       // Nouvelle recherche validée → replier si résultats, dérouler sinon.
       setFiltersOpen(filtered.length === 0);
     } catch (e) {
-      setSummary(e instanceof Error ? e.message : 'Erreur');
+      console.warn('Erreur recherche :', e);
+      setSummary('Impossible de charger les lieux. Vérifiez votre connexion puis réessayez.');
       setPlaces([]);
       setFiltersOpen(true);
     } finally {
@@ -184,8 +187,9 @@ export default function PlacesScreen({ onSelectPlace }: PlacesScreenProps) {
       setSummary('Lieux autour de vous (rayon 5 km)');
       setFiltersOpen(filtered.length === 0);
     } catch (e) {
+      console.warn('Erreur nearby :', e);
       setPlaces([]);
-      setSummary(e instanceof Error ? e.message : 'Erreur');
+      setSummary('Impossible de charger les lieux autour de vous. Vérifiez votre connexion puis réessayez.');
       setFiltersOpen(true);
     } finally {
       setLoading(false);
@@ -279,7 +283,7 @@ export default function PlacesScreen({ onSelectPlace }: PlacesScreenProps) {
                 name="globe"
                 width={18}
                 height={18}
-                fill={category === '' ? '#fff' : '#374151'}
+                fill={category === '' ? colors.surface : colors.textStrong}
               />
               <Text style={[styles.chipText, category === '' && styles.chipTextActive]}>Tous</Text>
             </TouchableOpacity>
@@ -299,7 +303,7 @@ export default function PlacesScreen({ onSelectPlace }: PlacesScreenProps) {
                   name={cat.icon}
                   width={18}
                   height={18}
-                  fill={category === cat.key ? '#fff' : '#374151'}
+                  fill={category === cat.key ? colors.surface : colors.textStrong}
                 />
                 <Text style={[styles.chipText, category === cat.key && styles.chipTextActive]}>
                   {cat.label}
@@ -362,7 +366,7 @@ export default function PlacesScreen({ onSelectPlace }: PlacesScreenProps) {
                 name="location-dot"
                 width={16}
                 height={16}
-                fill={nearbyActive ? '#fff' : '#2563eb'}
+                fill={nearbyActive ? colors.surface : colors.primary}
               />
               <Text style={[styles.mapToggleText, nearbyActive && styles.mapToggleActiveText]}>
                 Autour de moi
@@ -382,7 +386,7 @@ export default function PlacesScreen({ onSelectPlace }: PlacesScreenProps) {
           <RefreshControl
             refreshing={refreshing}
             onRefresh={onRefresh}
-            colors={['#2563eb']}
+            colors={[colors.primary]}
             tintColor="#2563eb"
           />
         }
@@ -424,10 +428,17 @@ export default function PlacesScreen({ onSelectPlace }: PlacesScreenProps) {
               {item.snippet && <Text style={styles.snippet}>{item.snippet}</Text>}
               {item.rating != null && <Text style={styles.rating}>★ {item.rating}</Text>}
             </View>
+            <View style={styles.cardChevron}>
+              <FontIcon name="chevron-right" width={16} height={16} fill="#9ca3af" />
+            </View>
           </TouchableOpacity>
         )}
         ListEmptyComponent={
-          !loading ? (
+          loading ? (
+            <View style={styles.loadingWrap}>
+              <ActivityIndicator size="large" color="#2563eb" />
+            </View>
+          ) : (
             <View style={styles.emptyState}>
               <View style={styles.emptyIcon}>
                 <FontIcon name="location-dot" width={44} height={44} fill="#9ca3af" />
@@ -452,13 +463,13 @@ export default function PlacesScreen({ onSelectPlace }: PlacesScreenProps) {
                   style={styles.emptyButton}
                   onPress={() => runSearch()}
                   accessibilityRole="button"
-                  accessibilityLabel="Vérifiez votre connexion et réessayez"
+                  accessibilityLabel="Réessayer le chargement des lieux"
                 >
-                  <Text style={styles.emptyButtonText}>Vérifiez votre connexion</Text>
+                  <Text style={styles.emptyButtonText}>Réessayer</Text>
                 </TouchableOpacity>
               )}
             </View>
-          ) : undefined
+          )
         }
         />
     </View>
@@ -472,22 +483,22 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     gap: 8,
-    backgroundColor: '#fff',
+    backgroundColor: colors.surface,
     borderWidth: 1,
-    borderColor: '#e5e7eb',
-    borderRadius: 12,
+    borderColor: colors.border,
+    borderRadius: radius.md,
     paddingHorizontal: 12,
     paddingVertical: 10,
     marginBottom: 12,
   },
   filtersBarSummaryArea: { flexDirection: 'row', alignItems: 'center', gap: 5, flexShrink: 1 },
-  filtersBarSummary: { color: '#111827', fontSize: 14, fontWeight: '600', flexShrink: 1 },
-  filtersBarChevron: { color: '#2563eb', fontWeight: '600', fontSize: 13 },
-  nearbyError: { color: '#dc2626', marginBottom: 12 },
+  filtersBarSummary: { color: colors.textPrimary, fontSize: 14, fontWeight: '600', flexShrink: 1 },
+  filtersBarChevron: { color: colors.primary, fontWeight: '600', fontSize: 13 },
+  nearbyError: { color: colors.danger, marginBottom: 12 },
   actionsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 12 },
   mapToggleInner: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  mapToggleActive: { backgroundColor: '#2563eb' },
-  mapToggleActiveText: { color: '#fff' },
+  mapToggleActive: { backgroundColor: colors.primary },
+  mapToggleActiveText: { color: colors.surface },
   chipsRow: { gap: 10, marginBottom: 50, paddingVertical: 4 },
   chip: {
     flexDirection: 'row',
@@ -495,59 +506,59 @@ const styles = StyleSheet.create({
     gap: 6,
     paddingHorizontal: 16,
     paddingVertical: 8,
-    borderRadius: 20,
-    backgroundColor: '#f3f4f6',
+    borderRadius: radius.xl,
+    backgroundColor: colors.chipBg,
     height: 40,
   },
-  chipAllActive: { backgroundColor: '#374151' },
-  chipText: { fontSize: 15, color: '#374151', fontWeight: '600' },
-  chipTextActive: { color: '#fff' },
+  chipAllActive: { backgroundColor: colors.textStrong },
+  chipText: { fontSize: 15, color: colors.textStrong, fontWeight: '600' },
+  chipTextActive: { color: colors.surface },
   input: {
     borderWidth: 1,
-    borderColor: '#d1d5db',
-    borderRadius: 12,
+    borderColor: colors.borderStrong,
+    borderRadius: radius.md,
     paddingHorizontal: 12,
     paddingVertical: 10,
-    backgroundColor: '#fff',
+    backgroundColor: colors.surface,
     marginBottom: 12,
   },
   button: {
-    backgroundColor: '#2563eb',
+    backgroundColor: colors.primary,
     padding: 14,
-    borderRadius: 12,
+    borderRadius: radius.md,
     alignItems: 'center',
     marginBottom: 12,
   },
-  buttonText: { color: '#fff', fontWeight: '600' },
-  summary: { color: '#6b7280', marginBottom: 12 },
+  buttonText: { color: colors.surface, fontWeight: '600' },
+  summary: { color: colors.textSecondary, marginBottom: 12 },
   mapToggle: {
-    backgroundColor: '#fff',
+    backgroundColor: colors.surface,
     borderWidth: 1,
-    borderColor: '#2563eb',
-    borderRadius: 12,
+    borderColor: colors.primary,
+    borderRadius: radius.md,
     paddingVertical: 10,
     paddingHorizontal: 12,
     alignItems: 'center',
     marginBottom: 12,
   },
-  mapToggleText: { color: '#2563eb', fontWeight: '600' },
+  mapToggleText: { color: colors.primary, fontWeight: '600' },
   card: {
     flexDirection: 'row',
     padding: 12,
-    borderRadius: 12,
-    backgroundColor: '#fff',
+    borderRadius: radius.md,
+    backgroundColor: colors.surface,
     borderWidth: 1,
-    borderColor: '#e5e7eb',
+    borderColor: colors.border,
     marginBottom: 10,
     gap: 12,
   },
-  thumbnail: { width: 84, height: 84, borderRadius: 10, backgroundColor: '#f3f4f6' },
+  thumbnail: { width: 84, height: 84, borderRadius: 10, backgroundColor: colors.chipBg },
   thumbnailPlaceholder: { alignItems: 'center', justifyContent: 'center' },
   cardBody: { flex: 1 },
   cardTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 },
   proBadge: {
-    backgroundColor: '#2563eb',
-    color: '#fff',
+    backgroundColor: colors.primary,
+    color: colors.surface,
     fontSize: 10,
     fontWeight: '700',
     paddingHorizontal: 5,
@@ -556,20 +567,22 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   name: { fontWeight: '600', fontSize: 16, marginBottom: 4 },
-  address: { color: '#6b7280', fontSize: 13, flexShrink: 1 },
+  address: { color: colors.textSecondary, fontSize: 13, flexShrink: 1 },
   addressRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  distance: { color: '#2563eb', fontSize: 13, fontWeight: '600' },
+  distance: { color: colors.primary, fontSize: 13, fontWeight: '600' },
   snippet: { marginTop: 6, fontSize: 14 },
-  rating: { marginTop: 6, color: '#ca8a04', fontWeight: '600' },
+  rating: { marginTop: 6, color: colors.rating, fontWeight: '600' },
   emptyState: { alignItems: 'center', paddingVertical: 40, paddingHorizontal: 24 },
   emptyIcon: { alignItems: 'center', justifyContent: 'center', marginBottom: 12 },
-  emptyTitle: { fontSize: 17, fontWeight: '700', color: '#111827', marginBottom: 6 },
-  emptyMessage: { color: '#6b7280', textAlign: 'center', marginBottom: 16 },
+  emptyTitle: { fontSize: 17, fontWeight: '700', color: colors.textPrimary, marginBottom: 6 },
+  emptyMessage: { color: colors.textSecondary, textAlign: 'center', marginBottom: 16 },
   emptyButton: {
-    backgroundColor: '#2563eb',
-    borderRadius: 12,
+    backgroundColor: colors.primary,
+    borderRadius: radius.md,
     paddingHorizontal: 16,
     paddingVertical: 10,
   },
-  emptyButtonText: { color: '#fff', fontWeight: '600' },
+  emptyButtonText: { color: colors.surface, fontWeight: '600' },
+  loadingWrap: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 60 },
+  cardChevron: { alignSelf: 'center' },
 });

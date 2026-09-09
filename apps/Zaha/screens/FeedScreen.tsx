@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   Dimensions,
   FlatList,
   Image,
@@ -18,10 +19,25 @@ import { launchImageLibrary } from 'react-native-image-picker';
 import { api, type Comment } from '../lib/api';
 import { supabase } from '../lib/supabase';
 import FontIcon from '../components/FontIcon';
+import { colors, radius } from '../theme';
 
 const DEMO_USER_ID = 'a1000000-0000-0000-0000-000000000001';
 const SCREEN_WIDTH = Dimensions.get('window').width;
 const CARD_WIDTH = SCREEN_WIDTH - 32;
+
+function formatRelativeTime(iso: string): string {
+  const parsed = Date.parse(iso);
+  if (Number.isNaN(parsed)) return '';
+  const seconds = Math.round((Date.now() - parsed) / 1000);
+  if (seconds < 60) return 'à l\u2019instant';
+  const minutes = Math.round(seconds / 60);
+  if (minutes < 60) return `il y a ${minutes} min`;
+  const hours = Math.round(minutes / 60);
+  if (hours < 24) return `il y a ${hours} h`;
+  const days = Math.round(hours / 24);
+  if (days < 7) return `il y a ${days} j`;
+  return new Date(parsed).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+}
 
 type FeedItem = {
   id: string;
@@ -51,6 +67,7 @@ export default function FeedScreen({ query, onClearSearch }: FeedScreenProps) {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [currentUserId, setCurrentUserId] = useState<string>(DEMO_USER_ID);
+  const [postError, setPostError] = useState<string | null>(null);
 
 
   // Create post
@@ -88,6 +105,7 @@ export default function FeedScreen({ query, onClearSearch }: FeedScreenProps) {
     (q?: string) => {
       setLoading(true);
       setError(null);
+      setPostError(null);
       return api.getFeed(undefined, q, currentUserId)
         .then(({ feed: items }) => setFeed(items))
         .catch((e: Error) => setError(e.message))
@@ -153,6 +171,34 @@ export default function FeedScreen({ query, onClearSearch }: FeedScreenProps) {
       });
   };
 
+  // Delete own post
+  const handleDeletePost = (item: FeedItem) => {
+    Alert.alert(
+      'Supprimer cette publication ?',
+      'Cette action est irréversible.',
+      [
+        { text: 'Annuler', style: 'cancel' },
+        {
+          text: 'Supprimer',
+          style: 'destructive',
+          onPress: () => confirmDeletePost(item),
+        },
+      ]
+    );
+  };
+
+  const confirmDeletePost = (item: FeedItem) => {
+    const previous = feed;
+    setFeed((prev) => prev.filter((p) => p.id !== item.id));
+    api
+      .deletePost(item.id, currentUserId)
+      .catch((e: Error) => {
+        console.warn('Erreur suppression post :', e.message);
+        setFeed(previous);
+        setPostError('Impossible de supprimer la publication.');
+      });
+  };
+
   // Create post
   const pickPhotos = () => {
     launchImageLibrary({ mediaType: 'mixed', selectionLimit: 5 }, (res) => {
@@ -199,8 +245,11 @@ export default function FeedScreen({ query, onClearSearch }: FeedScreenProps) {
   if (error) {
     return (
       <View style={styles.center}>
-        <Text style={styles.error}>{error}</Text>
-        <Text style={styles.hint}>Vérifiez que l'API tourne (npm run dev:api)</Text>
+        <Text style={styles.emptyTitle}>Impossible de charger le fil d’actualité</Text>
+        <Text style={styles.hint}>Vérifiez votre connexion puis réessayez.</Text>
+        <TouchableOpacity style={styles.emptyButton} onPress={() => load(query)} accessibilityRole="button" accessibilityLabel="Réessayer de charger le fil">
+          <Text style={styles.emptyButtonText}>Réessayer</Text>
+        </TouchableOpacity>
       </View>
     );
   }
@@ -209,12 +258,15 @@ export default function FeedScreen({ query, onClearSearch }: FeedScreenProps) {
 
   return (
     <View style={styles.root}>
+      {postError ? (
+        <Text style={styles.postErrorBanner}>{postError}</Text>
+      ) : null}
       <FlatList
         data={feed}
         keyExtractor={(item) => item.id}
         contentContainerStyle={styles.list}
         refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={['#2563eb']} tintColor="#2563eb" />
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[colors.primary]} tintColor="#2563eb" />
         }
 
         ListEmptyComponent={
@@ -255,6 +307,7 @@ export default function FeedScreen({ query, onClearSearch }: FeedScreenProps) {
             currentUserId={currentUserId}
             onToggleLike={handleToggleLike}
             onToggleFollow={handleToggleFollow}
+            onDeletePost={handleDeletePost}
             onRefreshFeed={() => load(query)}
           />
         )}
@@ -334,12 +387,14 @@ function PostCard({
   currentUserId,
   onToggleLike,
   onToggleFollow,
+  onDeletePost,
   onRefreshFeed,
 }: {
   item: FeedItem;
   currentUserId: string;
   onToggleLike: (postId: string) => void;
   onToggleFollow: (userId: string) => void;
+  onDeletePost: (item: FeedItem) => void;
   onRefreshFeed: () => void;
 }) {
   const [showAllComments, setShowAllComments] = useState(false);
@@ -347,9 +402,17 @@ function PostCard({
   const [commentDraft, setCommentDraft] = useState('');
   const [sendingComment, setSendingComment] = useState(false);
   const [comments, setComments] = useState<Comment[]>(item.commentsList ?? []);
+  const [commentError, setCommentError] = useState<string | null>(null);
 
   const toggleComments = () => {
-    setCommentsExpanded((prev) => !prev);
+    setCommentsExpanded((prev) => {
+      const next = !prev;
+      if (next) {
+        setCommentError(null);
+        refreshComments();
+      }
+      return next;
+    });
   };
 
   const refreshComments = async () => {
@@ -365,6 +428,7 @@ function PostCard({
     const text = commentDraft.trim();
     if (!text || sendingComment) return;
     setSendingComment(true);
+    setCommentError(null);
     const optimistic: Comment = {
       id: `temp-${Date.now()}`,
       post_id: item.id,
@@ -388,13 +452,31 @@ function PostCard({
     }
   };
 
-  const handleDeleteComment = async (comment: Comment) => {
+  const handleDeleteComment = (comment: Comment) => {
     if (comment.author_id !== currentUserId) return;
+    Alert.alert(
+      'Supprimer ce commentaire ?',
+      'Cette action est irréversible.',
+      [
+        { text: 'Annuler', style: 'cancel' },
+        {
+          text: 'Supprimer',
+          style: 'destructive',
+          onPress: () => confirmDeleteComment(comment),
+        },
+      ]
+    );
+  };
+
+  const confirmDeleteComment = async (comment: Comment) => {
+    const previous = comments;
     setComments((prev) => prev.filter((c) => c.id !== comment.id));
     try {
       await api.deleteComment(item.id, comment.id, currentUserId);
     } catch (e) {
       console.warn('Erreur suppression commentaire :', e);
+      setComments(previous);
+      setCommentError('Impossible de supprimer le commentaire.');
     }
   };
 
@@ -411,6 +493,7 @@ function PostCard({
             {item.author}
           </Text>
           <Text style={styles.location}>{item.location}</Text>
+          {item.timestamp ? <Text style={styles.timestamp}>{formatRelativeTime(item.timestamp)}</Text> : null}
         </View>
         {item.authorId && item.authorId !== currentUserId && (
           <TouchableOpacity
@@ -422,6 +505,17 @@ function PostCard({
             <Text style={[styles.followText, item.isFollowing && styles.followTextActive]}>
               {item.isFollowing ? 'Suivi' : 'Suivre'}
             </Text>
+          </TouchableOpacity>
+        )}
+        {item.authorId === currentUserId && (
+          <TouchableOpacity
+            style={styles.deleteBtn}
+            onPress={() => onDeletePost(item)}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            accessibilityRole="button"
+            accessibilityLabel="Supprimer cette publication"
+          >
+            <FontIcon name="trash" width={16} height={16} fill={colors.danger} />
           </TouchableOpacity>
         )}
       </View>
@@ -451,9 +545,9 @@ function PostCard({
         >
           <FontIcon
             name={item.hasLiked ? 'heart' : 'heart-outline'}
-            width={18}
-            height={18}
-            fill={item.hasLiked ? '#ef4444' : '#6b7280'}
+            width={26}
+            height={26}
+            fill={item.hasLiked ? colors.like : colors.textSecondary}
           />
           <Text style={[styles.likeCount, item.hasLiked && styles.likeCountActive]}>{item.likes}</Text>
         </TouchableOpacity>
@@ -467,9 +561,9 @@ function PostCard({
         >
           <FontIcon
             name="comment"
-            width={16}
-            height={16}
-            fill={commentsExpanded ? '#2563eb' : '#6b7280'}
+            width={24}
+            height={24}
+            fill={commentsExpanded ? colors.primary : colors.textSecondary}
           />
           <Text style={styles.commentCount}>{comments.length}</Text>
         </TouchableOpacity>
@@ -499,6 +593,7 @@ function PostCard({
                       {isMine ? ' · toi' : ''}
                     </Text>
                     <Text style={styles.commentText}>{c.text}</Text>
+                    {c.created_at ? <Text style={styles.timestamp}>{formatRelativeTime(c.created_at)}</Text> : null}
                   </View>
                 </TouchableOpacity>
               );
@@ -513,6 +608,8 @@ function PostCard({
             </View>
           </ScrollView>
         )}
+
+        {commentError ? <Text style={styles.commentError}>{commentError}</Text> : null}
 
         {/* Input commentaire */}
         <View style={styles.commentInputRow}>
@@ -602,18 +699,20 @@ const styles = StyleSheet.create({
 
 
   // Card
-  card: { backgroundColor: '#fff', borderRadius: 16, overflow: 'hidden', marginBottom: 16, borderWidth: 1, borderColor: '#e5e7eb' },
+  card: { backgroundColor: colors.surface, borderRadius: radius.lg, overflow: 'hidden', marginBottom: 16, borderWidth: 1, borderColor: colors.border },
   header: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 12 },
   headerText: { flex: 1 },
-  avatar: { width: 40, height: 40, borderRadius: 20 },
+  avatar: { width: 40, height: 40, borderRadius: radius.xl },
   author: { fontWeight: '600', fontSize: 15 },
-  location: { color: '#6b7280', fontSize: 13 },
+  location: { color: colors.textSecondary, fontSize: 13 },
+  timestamp: { color: colors.textMuted, fontSize: 12, marginTop: 2 },
 
   // Follow
-  followBtn: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20, borderWidth: 1, borderColor: '#2563eb', minHeight: 36, justifyContent: 'center' },
-  followBtnActive: { backgroundColor: '#2563eb' },
-  followText: { fontSize: 13, color: '#2563eb', fontWeight: '600' },
-  followTextActive: { color: '#fff' },
+  followBtn: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: radius.xl, borderWidth: 1, borderColor: colors.primary, minHeight: 36, justifyContent: 'center' },
+  deleteBtn: { padding: 8, borderRadius: radius.xl, justifyContent: 'center', alignItems: 'center' },
+  followBtnActive: { backgroundColor: colors.primary },
+  followText: { fontSize: 13, color: colors.primary, fontWeight: '600' },
+  followTextActive: { color: colors.surface },
 
   // Media
   media: { width: '100%', height: 220 },
@@ -622,62 +721,62 @@ const styles = StyleSheet.create({
     position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
     backgroundColor: 'rgba(0,0,0,0.3)', alignItems: 'center', justifyContent: 'center',
   },
-  carouselVideoIcon: { color: '#fff', fontSize: 40 },
+  carouselVideoIcon: { color: colors.surface, fontSize: 40 },
   singleMediaWrap: { position: 'relative' },
   singleVideoOverlay: {
     position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
     backgroundColor: 'rgba(0,0,0,0.3)', alignItems: 'center', justifyContent: 'center',
   },
-  singleVideoIcon: { color: '#fff', fontSize: 40 },
+  singleVideoIcon: { color: colors.surface, fontSize: 40 },
   dots: { position: 'absolute', left: 0, right: 0, bottom: 10, flexDirection: 'row', justifyContent: 'center', gap: 6 },
   dot: { width: 7, height: 7, borderRadius: 4, backgroundColor: 'rgba(255,255,255,0.5)' },
-  dotActive: { backgroundColor: '#fff' },
+  dotActive: { backgroundColor: colors.surface },
 
   // Content
   content: { padding: 12, fontSize: 15, lineHeight: 22 },
   metaRow: { flexDirection: 'row', alignItems: 'center', gap: 16, paddingHorizontal: 12, paddingBottom: 12 },
   likeButton: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  likeCount: { color: '#6b7280', fontSize: 14, fontWeight: '600' },
-  likeCountActive: { color: '#ef4444' },
+  likeCount: { color: colors.textSecondary, fontSize: 14, fontWeight: '600' },
+  likeCountActive: { color: colors.like },
   commentButton: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  commentCount: { color: '#6b7280', fontSize: 14, fontWeight: '600' },
+  commentCount: { color: colors.textSecondary, fontSize: 14, fontWeight: '600' },
 
   // Comments
   commentsScroll: { maxHeight: 220 },
   commentsSection: { paddingHorizontal: 12, paddingVertical: 10, gap: 6 },
   commentRow: { flexDirection: 'row' },
   commentBubble: {
-    backgroundColor: '#f3f4f6',
-    borderRadius: 12,
+    backgroundColor: colors.chipBg,
+    borderRadius: radius.md,
     paddingHorizontal: 12,
     paddingVertical: 8,
     maxWidth: '92%',
   },
-  commentAuthor: { fontSize: 12, fontWeight: '700', color: '#374151', marginBottom: 2 },
-  commentText: { fontSize: 14, color: '#111827', lineHeight: 19 },
-  viewAllText: { color: '#2563eb', fontSize: 13, fontWeight: '600', paddingVertical: 6 },
+  commentAuthor: { fontSize: 12, fontWeight: '700', color: colors.textStrong, marginBottom: 2 },
+  commentText: { fontSize: 14, color: colors.textPrimary, lineHeight: 19 },
+  viewAllText: { color: colors.primary, fontSize: 13, fontWeight: '600', paddingVertical: 6 },
   commentInputRow: {
     flexDirection: 'row',
     alignItems: 'center',
     borderTopWidth: 1,
-    borderColor: '#f3f4f6',
+    borderColor: colors.chipBg,
     padding: 10,
     gap: 8,
   },
   commentInput: {
     flex: 1,
     borderWidth: 1,
-    borderColor: '#d1d5db',
-    borderRadius: 20,
+    borderColor: colors.borderStrong,
+    borderRadius: radius.xl,
     paddingHorizontal: 14,
     paddingVertical: 8,
     fontSize: 14,
-    backgroundColor: '#f8fafc',
-    color: '#111827',
+    backgroundColor: colors.inputBg,
+    color: colors.textPrimary,
   },
   commentSubmit: {
-    backgroundColor: '#2563eb',
-    borderRadius: 20,
+    backgroundColor: colors.primary,
+    borderRadius: radius.xl,
     paddingHorizontal: 16,
     paddingVertical: 8,
     justifyContent: 'center',
@@ -685,52 +784,54 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   commentSubmitDisabled: { opacity: 0.5 },
-  commentSubmitText: { color: '#fff', fontWeight: '600', fontSize: 14 },
+  commentSubmitText: { color: colors.surface, fontWeight: '600', fontSize: 14 },
+  commentError: { color: colors.danger, fontSize: 13, textAlign: 'center', paddingHorizontal: 12, paddingBottom: 6 },
+  postErrorBanner: { color: colors.danger, fontSize: 13, textAlign: 'center', paddingHorizontal: 16, paddingVertical: 8, backgroundColor: colors.dangerBg },
 
   // Error / empty
-  error: { color: '#dc2626', textAlign: 'center', marginBottom: 8 },
-  hint: { color: '#6b7280', textAlign: 'center' },
+  error: { color: colors.danger, textAlign: 'center', marginBottom: 8 },
+  hint: { color: colors.textSecondary, textAlign: 'center' },
   emptyState: { alignItems: 'center', paddingVertical: 48, paddingHorizontal: 24 },
   emptyIcon: { alignItems: 'center', justifyContent: 'center', marginBottom: 12 },
-  emptyTitle: { fontSize: 17, fontWeight: '700', color: '#111827', marginBottom: 6 },
-  emptyMessage: { color: '#6b7280', textAlign: 'center', marginBottom: 16 },
-  emptyButton: { backgroundColor: '#2563eb', borderRadius: 12, paddingHorizontal: 16, paddingVertical: 10 },
-  emptyButtonText: { color: '#fff', fontWeight: '600' },
+  emptyTitle: { fontSize: 17, fontWeight: '700', color: colors.textPrimary, marginBottom: 6 },
+  emptyMessage: { color: colors.textSecondary, textAlign: 'center', marginBottom: 16 },
+  emptyButton: { backgroundColor: colors.primary, borderRadius: radius.md, paddingHorizontal: 16, paddingVertical: 10 },
+  emptyButtonText: { color: colors.surface, fontWeight: '600' },
 
   // Skeleton
-  skeletonCard: { backgroundColor: '#fff', borderRadius: 16, borderWidth: 1, borderColor: '#e5e7eb', overflow: 'hidden', marginBottom: 16, padding: 12 },
+  skeletonCard: { backgroundColor: colors.surface, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.border, overflow: 'hidden', marginBottom: 16, padding: 12 },
   skeletonHeader: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 12 },
-  skeletonAvatar: { width: 40, height: 40, borderRadius: 20, backgroundColor: '#e5e7eb' },
+  skeletonAvatar: { width: 40, height: 40, borderRadius: radius.xl, backgroundColor: colors.border },
   skeletonHeaderLines: { gap: 8 },
-  skeletonLine: { height: 12, borderRadius: 6, backgroundColor: '#e5e7eb' },
-  skeletonMedia: { height: 180, borderRadius: 8 },
+  skeletonLine: { height: 12, borderRadius: 6, backgroundColor: colors.border },
+  skeletonMedia: { height: 180, borderRadius: radius.sm },
 
   // FAB
-  fab: { position: 'absolute', right: 20, bottom: 20, width: 56, height: 56, borderRadius: 28, backgroundColor: '#2563eb', alignItems: 'center', justifyContent: 'center', elevation: 8, shadowColor: '#000', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.3, shadowRadius: 6 },
-  fabText: { color: '#fff', fontSize: 28, lineHeight: 30, fontWeight: '300' },
+  fab: { position: 'absolute', right: 20, bottom: 20, width: 56, height: 56, borderRadius: 28, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center', elevation: 8, shadowColor: '#000', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.3, shadowRadius: 6 },
+  fabText: { color: colors.surface, fontSize: 28, lineHeight: 30, fontWeight: '300' },
 
   // Modal
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },
-  modalCard: { backgroundColor: '#fff', borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, maxHeight: '85%' },
+  modalCard: { backgroundColor: colors.surface, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, maxHeight: '85%' },
   modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
-  modalTitle: { fontSize: 18, fontWeight: '700', color: '#111827' },
-  modalClose: { fontSize: 20, color: '#6b7280', padding: 4 },
-  modalInput: { borderWidth: 1, borderColor: '#d1d5db', borderRadius: 12, padding: 14, minHeight: 80, textAlignVertical: 'top', fontSize: 15, backgroundColor: '#f8fafc', marginBottom: 12 },
+  modalTitle: { fontSize: 18, fontWeight: '700', color: colors.textPrimary },
+  modalClose: { fontSize: 20, color: colors.textSecondary, padding: 4 },
+  modalInput: { borderWidth: 1, borderColor: colors.borderStrong, borderRadius: radius.md, padding: 14, minHeight: 80, textAlignVertical: 'top', fontSize: 15, backgroundColor: colors.inputBg, marginBottom: 12 },
   modalPhotos: { marginBottom: 12 },
   modalPhotoWrap: { position: 'relative', marginRight: 8 },
   modalPhoto: { width: 80, height: 80, borderRadius: 10 },
-  modalPhotoRemove: { position: 'absolute', top: -6, right: -6, width: 22, height: 22, borderRadius: 11, backgroundColor: '#dc2626', alignItems: 'center', justifyContent: 'center' },
-  modalPhotoRemoveText: { color: '#fff', fontSize: 12, fontWeight: '700' },
+  modalPhotoRemove: { position: 'absolute', top: -6, right: -6, width: 22, height: 22, borderRadius: 11, backgroundColor: colors.danger, alignItems: 'center', justifyContent: 'center' },
+  modalPhotoRemoveText: { color: colors.surface, fontSize: 12, fontWeight: '700' },
   videoOverlay: {
     position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
     backgroundColor: 'rgba(0,0,0,0.3)', alignItems: 'center', justifyContent: 'center',
   },
-  videoIcon: { color: '#fff', fontSize: 24 },
+  videoIcon: { color: colors.surface, fontSize: 24 },
   modalActions: { flexDirection: 'row', gap: 10 },
-  modalAddPhoto: { flex: 1, paddingVertical: 12, borderRadius: 12, borderWidth: 1, borderColor: '#d1d5db', alignItems: 'center' },
+  modalAddPhoto: { flex: 1, paddingVertical: 12, borderRadius: radius.md, borderWidth: 1, borderColor: colors.borderStrong, alignItems: 'center' },
   modalAddPhotoRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  modalAddPhotoText: { fontSize: 14, color: '#374151', fontWeight: '600' },
-  modalSubmit: { flex: 1, paddingVertical: 12, borderRadius: 12, backgroundColor: '#2563eb', alignItems: 'center' },
+  modalAddPhotoText: { fontSize: 14, color: colors.textStrong, fontWeight: '600' },
+  modalSubmit: { flex: 1, paddingVertical: 12, borderRadius: radius.md, backgroundColor: colors.primary, alignItems: 'center' },
   modalSubmitDisabled: { opacity: 0.5 },
-  modalSubmitText: { color: '#fff', fontSize: 14, fontWeight: '700' },
+  modalSubmitText: { color: colors.surface, fontSize: 14, fontWeight: '700' },
 });

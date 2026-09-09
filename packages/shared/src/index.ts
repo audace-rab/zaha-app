@@ -48,6 +48,7 @@ export interface Comment {
 
 export interface FeedItem {
   id: string;
+  authorId: string;
   author: string;
   authorAvatar: string;
   authorCountryFlag?: string;

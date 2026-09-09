@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import { api } from '../lib/api';
 import FontIcon from '../components/FontIcon';
+import { colors, radius } from '../theme';
 
 type ChatMessage = {
   id: string;
@@ -19,7 +20,13 @@ type ChatMessage = {
   text: string;
   timestamp: number;
   sources?: { uri: string; title: string }[];
+  failed?: boolean;
 };
+
+function formatTime(ts: number) {
+  const d = new Date(ts);
+  return d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+}
 
 const DEFAULT_COORDS = { latitude: -18.8792, longitude: 47.5079 };
 const INPUT_HEIGHT = 70;
@@ -53,25 +60,12 @@ export default function ChatScreen() {
     return () => { showSub.remove(); hideSub.remove(); };
   }, []);
 
-  const send = async () => {
-    if (!input.trim() || loading) return;
-
-    const userMessage: ChatMessage = {
-      id: String(Date.now()),
-      role: 'user',
-      text: input.trim(),
-      timestamp: Date.now(),
-    };
-
-    const nextMessages = [...messages, userMessage];
-    setMessages(nextMessages);
-    setInput('');
+  const performChat = async (history: ChatMessage[]) => {
     setLoading(true);
-
     try {
-      const response = await api.chat(nextMessages, DEFAULT_COORDS);
+      const response = await api.chat(history, DEFAULT_COORDS);
       setMessages([
-        ...nextMessages,
+        ...history,
         {
           id: String(Date.now() + 1),
           role: 'model',
@@ -81,18 +75,45 @@ export default function ChatScreen() {
         },
       ]);
     } catch (e) {
+      console.warn('Erreur chat :', e);
       setMessages([
-        ...nextMessages,
+        ...history,
         {
           id: String(Date.now() + 1),
           role: 'model',
-          text: e instanceof Error ? e.message : 'Erreur de connexion à l\'API',
+          text: 'Je n’ai pas pu répondre. Vérifiez votre connexion puis réessayez.',
           timestamp: Date.now(),
+          failed: true,
         },
       ]);
     } finally {
       setLoading(false);
     }
+  };
+
+  const send = () => {
+    const text = input.trim();
+    if (!text || loading) return;
+
+    const nextMessages = [
+      ...messages,
+      {
+        id: String(Date.now()),
+        role: 'user' as const,
+        text,
+        timestamp: Date.now(),
+      },
+    ];
+    setMessages(nextMessages);
+    setInput('');
+    performChat(nextMessages);
+  };
+
+  const retry = (failedMsg: ChatMessage) => {
+    if (loading) return;
+    const nextMessages = messages.filter((m) => m.id !== failedMsg.id);
+    setMessages(nextMessages);
+    performChat(nextMessages);
   };
 
   return (
@@ -112,6 +133,21 @@ export default function ChatScreen() {
             <Text style={item.role === 'user' ? styles.userText : styles.modelText}>
               {item.text}
             </Text>
+            <View style={styles.bubbleFooter}>
+              <Text style={item.role === 'user' ? styles.userTime : styles.modelTime}>
+                {formatTime(item.timestamp)}
+              </Text>
+              {item.failed ? (
+                <TouchableOpacity
+                  style={styles.retryBtn}
+                  onPress={() => retry(item)}
+                  accessibilityRole="button"
+                  accessibilityLabel="Réessayer la réponse"
+                >
+                  <Text style={styles.retryText}>↻ Réessayer</Text>
+                </TouchableOpacity>
+              ) : null}
+            </View>
             {item.role === 'model' && item.sources && item.sources.length > 0 && (
               <View style={styles.sources}>
                 {item.sources.map((source, index) => (
@@ -166,24 +202,29 @@ export default function ChatScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f9fafb' },
+  container: { flex: 1, backgroundColor: colors.background },
   list: { padding: 16, gap: 8 },
-  bubble: { maxWidth: '85%', padding: 12, borderRadius: 16, marginBottom: 8 },
-  userBubble: { alignSelf: 'flex-end', backgroundColor: '#2563eb' },
-  modelBubble: { alignSelf: 'flex-start', backgroundColor: '#fff', borderWidth: 1, borderColor: '#e5e7eb' },
-  userText: { color: '#fff' },
-  modelText: { color: '#111827' },
+  bubble: { maxWidth: '85%', padding: 12, borderRadius: radius.lg, marginBottom: 8 },
+  userBubble: { alignSelf: 'flex-end', backgroundColor: colors.primary },
+  modelBubble: { alignSelf: 'flex-start', backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border },
+  userText: { color: colors.surface },
+  modelText: { color: colors.textPrimary },
+  bubbleFooter: { flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', gap: 12, marginTop: 4 },
+  userTime: { color: 'rgba(255,255,255,0.75)', fontSize: 11, alignSelf: 'flex-end' },
+  modelTime: { color: colors.textMuted, fontSize: 11, alignSelf: 'flex-end' },
+  retryBtn: { paddingVertical: 2 },
+  retryText: { color: colors.primary, fontWeight: '600', fontSize: 13 },
   sources: { marginTop: 8, gap: 4 },
   sourceLink: { paddingVertical: 2 },
   sourceRow: { flexDirection: 'row', alignItems: 'center', gap: 5 },
-  sourceText: { color: '#2563eb', fontSize: 13 },
+  sourceText: { color: colors.primary, fontSize: 13 },
   typingBubble: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
     alignSelf: 'flex-start',
   },
-  typingText: { color: '#6b7280', fontStyle: 'italic' },
+  typingText: { color: colors.textSecondary, fontStyle: 'italic' },
   inputRow: {
     position: 'absolute',
     left: 0,
@@ -192,14 +233,14 @@ const styles = StyleSheet.create({
     padding: 12,
     gap: 8,
     borderTopWidth: 1,
-    borderColor: '#e5e7eb',
-    backgroundColor: '#fff',
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
   },
   input: {
     flex: 1,
     borderWidth: 1,
-    borderColor: '#d1d5db',
-    borderRadius: 12,
+    borderColor: colors.borderStrong,
+    borderRadius: radius.md,
     paddingHorizontal: 12,
     paddingVertical: 10,
     maxHeight: 100,
@@ -208,9 +249,9 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: '#2563eb',
+    backgroundColor: colors.primary,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  sendText: { color: '#fff', fontSize: 20, fontWeight: '600' },
+  sendText: { color: colors.surface, fontSize: 20, fontWeight: '600' },
 });

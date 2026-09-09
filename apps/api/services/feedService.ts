@@ -101,6 +101,7 @@ export async function getFeed(filters?: FeedFilters): Promise<FeedItem[]> {
 
     const item: FeedItem = {
       id: post.id,
+      authorId: author?.id ?? '',
       author: author?.name ?? 'Utilisateur',
       authorAvatar: author?.avatar_url ?? '',
       authorCountryFlag: author?.country_flag ?? undefined,

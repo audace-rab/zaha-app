@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   BackHandler,
   FlatList,
   RefreshControl,
@@ -12,17 +13,19 @@ import {
 } from 'react-native';
 import { supabase } from '../lib/supabase';
 import { api, type Reservation } from '../lib/api';
+import { formatDateDisplay } from '../lib/format';
 import FontIcon from '../components/FontIcon';
+import { colors, radius } from '../theme';
 
 const DEMO_USER_ID = 'a1000000-0000-0000-0000-000000000001';
 
 type StatusFilter = 'all' | Reservation['status'];
 
 const STATUS_CONFIG: Record<Reservation['status'], { color: string; bg: string; label: string }> = {
-  pending: { color: '#d97706', bg: '#fef3c7', label: 'En attente' },
-  confirmed: { color: '#16a34a', bg: '#dcfce7', label: 'Confirmée' },
-  cancelled: { color: '#dc2626', bg: '#fee2e2', label: 'Annulée' },
-  completed: { color: '#2563eb', bg: '#dbeafe', label: 'Terminée' },
+  pending: { color: colors.warning, bg: colors.warningBg, label: 'En attente' },
+  confirmed: { color: colors.success, bg: colors.successBg, label: 'Confirmée' },
+  cancelled: { color: colors.danger, bg: colors.dangerBg, label: 'Annulée' },
+  completed: { color: colors.primary, bg: colors.info, label: 'Terminée' },
 };
 
 const STATUS_FILTERS: { key: StatusFilter; label: string }[] = [
@@ -72,7 +75,7 @@ export default function ReservationHistoryScreen({ onBack }: ReservationHistoryS
 
   const load = useCallback(
     (statusOverride?: StatusFilter) => {
-      const statusParam = statusOverride === 'all' ? undefined : (statusOverride ?? filter === 'all' ? undefined : filter);
+      const statusParam = statusOverride === 'all' ? undefined : (statusOverride ?? (filter === 'all' ? undefined : filter));
       setLoading(true);
       setError(null);
       return api
@@ -94,8 +97,24 @@ export default function ReservationHistoryScreen({ onBack }: ReservationHistoryS
     setRefreshing(false);
   };
 
-  const handleCancel = async (id: string) => {
+  const handleCancel = (id: string) => {
+    Alert.alert(
+      'Annuler cette réservation ?',
+      'Cette action est irréversible.',
+      [
+        { text: 'Non', style: 'cancel' },
+        {
+          text: 'Oui, annuler',
+          style: 'destructive',
+          onPress: () => confirmCancel(id),
+        },
+      ]
+    );
+  };
+
+  const confirmCancel = async (id: string) => {
     setCancellingId(id);
+    setError(null);
     try {
       await api.cancelReservation(id, currentUserId);
       setReservations((prev) =>
@@ -103,6 +122,7 @@ export default function ReservationHistoryScreen({ onBack }: ReservationHistoryS
       );
     } catch (e) {
       console.warn('Erreur annulation :', e);
+      setError('Impossible d\u2019annuler la réservation. Vérifiez votre connexion puis réessayez.');
     } finally {
       setCancellingId(null);
     }
@@ -132,12 +152,14 @@ export default function ReservationHistoryScreen({ onBack }: ReservationHistoryS
         ))}
       </ScrollView>
 
+      {error ? <Text style={styles.error}>{error}</Text> : null}
+
       <FlatList
         data={reservations}
         keyExtractor={(item) => item.id}
         contentContainerStyle={styles.list}
         refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={['#2563eb']} tintColor="#2563eb" />
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[colors.primary]} tintColor="#2563eb" />
         }
         ListEmptyComponent={
           loading ? (
@@ -175,7 +197,7 @@ export default function ReservationHistoryScreen({ onBack }: ReservationHistoryS
               </View>
               <View style={styles.cardDateRow}>
                 <FontIcon name="calendar" width={14} height={14} fill="#374151" />
-                <Text style={styles.cardDate}>{item.date}</Text>
+                <Text style={styles.cardDate}>{formatDateDisplay(item.date)}</Text>
                 {item.time_start ? (
                   <>
                     <FontIcon name="clock" width={14} height={14} fill="#374151" />
@@ -234,57 +256,58 @@ export default function ReservationHistoryScreen({ onBack }: ReservationHistoryS
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f9fafb', justifyContent: 'flex-start' },
+  container: { flex: 1, backgroundColor: colors.background, justifyContent: 'flex-start' },
   filtersRow: { paddingHorizontal: 16, paddingVertical: 12, gap: 8 },
   filterChip: {
     paddingHorizontal: 16,
     paddingVertical: 8,
-    borderRadius: 20,
-    backgroundColor: '#f3f4f6',
+    borderRadius: radius.xl,
+    backgroundColor: colors.chipBg,
     borderWidth: 1,
-    borderColor: '#e5e7eb',
+    borderColor: colors.border,
     minHeight: 36,
     maxHeight : 36,
     justifyContent: 'center',
   },
-  filterChipActive: { backgroundColor: '#2563eb', borderColor: '#2563eb' },
-  filterText: { fontSize: 13, color: '#374151', fontWeight: '500' },
-  filterTextActive: { color: '#fff' },
+  filterChipActive: { backgroundColor: colors.primary, borderColor: colors.primary },
+  filterText: { fontSize: 13, color: colors.textStrong, fontWeight: '500' },
+  filterTextActive: { color: colors.surface },
+  error: { color: colors.danger, fontSize: 13, textAlign: 'center', paddingHorizontal: 16, paddingTop: 8 },
   list: { justifyContent: 'flex-start', paddingTop: 0, paddingHorizontal: 16, paddingBottom: 40 },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingVertical: 60 },
   emptyState: { alignItems: 'center', paddingVertical: 60, paddingHorizontal: 24 },
   emptyIcon: { alignItems: 'center', justifyContent: 'center', marginBottom: 12 },
-  emptyTitle: { fontSize: 17, fontWeight: '700', color: '#111827', marginBottom: 6 },
-  emptyMessage: { color: '#6b7280', textAlign: 'center' },
+  emptyTitle: { fontSize: 17, fontWeight: '700', color: colors.textPrimary, marginBottom: 6 },
+  emptyMessage: { color: colors.textSecondary, textAlign: 'center' },
   card: {
-    backgroundColor: '#fff',
-    borderRadius: 12,
+    backgroundColor: colors.surface,
+    borderRadius: radius.md,
     borderWidth: 1,
-    borderColor: '#e5e7eb',
+    borderColor: colors.border,
     padding: 14,
     marginBottom: 12,
     gap: 6,
   },
   cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 8 },
   cardHeaderLeft: { flexDirection: 'row', alignItems: 'center', gap: 4, flexShrink: 1 },
-  cardPlace: { fontSize: 15, fontWeight: '600', color: '#111827', flexShrink: 1 },
-  statusBadge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 12, flexShrink: 0 },
+  cardPlace: { fontSize: 15, fontWeight: '600', color: colors.textPrimary, flexShrink: 1 },
+  statusBadge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: radius.md, flexShrink: 0 },
   statusText: { fontSize: 11, fontWeight: '700' },
-  cardDate: { color: '#374151', fontSize: 14 },
+  cardDate: { color: colors.textStrong, fontSize: 14 },
   cardDateRow: { flexDirection: 'row', alignItems: 'center', gap: 4, flexWrap: 'wrap' },
-  cardGuests: { color: '#6b7280', fontSize: 13 },
+  cardGuests: { color: colors.textSecondary, fontSize: 13 },
   cardGuestsRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 12 },
   cardGuestsItem: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   cardNoteRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  cardNote: { color: '#6b7280', fontSize: 13, fontStyle: 'italic', marginTop: 0, flexShrink: 1 },
+  cardNote: { color: colors.textSecondary, fontSize: 13, fontStyle: 'italic', marginTop: 0, flexShrink: 1 },
   cancelBtn: {
     marginTop: 8,
     alignSelf: 'flex-start',
     paddingHorizontal: 14,
     paddingVertical: 8,
-    borderRadius: 12,
+    borderRadius: radius.md,
     borderWidth: 1,
-    borderColor: '#dc2626',
+    borderColor: colors.danger,
   },
-  cancelBtnText: { color: '#dc2626', fontSize: 13, fontWeight: '600' },
+  cancelBtnText: { color: colors.danger, fontSize: 13, fontWeight: '600' },
 });

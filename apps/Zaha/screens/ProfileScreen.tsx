@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   Image,
+  Linking,
   SafeAreaView,
   ScrollView,
   StyleSheet,
@@ -14,6 +16,7 @@ import { launchImageLibrary } from 'react-native-image-picker';
 import { api, type Profile } from '../lib/api';
 import { supabase } from '../lib/supabase';
 import FontIcon from '../components/FontIcon';
+import { colors, radius } from '../theme';
 
 type ProfileScreenProps = {
   onOpenFavorites?: () => void;
@@ -139,8 +142,30 @@ export default function ProfileScreen({ onOpenFavorites, onOpenReservations }: P
     }
   };
 
-  const handleSignOut = async () => {
-    await supabase.auth.signOut();
+  const openWebsite = async (url: string) => {
+    const target = /^https?:\/\//i.test(url) ? url : `https://${url}`;
+    try {
+      await Linking.openURL(target);
+    } catch {
+      Alert.alert('Impossible d’ouvrir le site', 'Vérifiez que l’adresse est correcte puis réessayez.');
+    }
+  };
+
+  const handleSignOut = () => {
+    Alert.alert(
+      'Se déconnecter ?',
+      'Vous devrez vous reconnecter pour accéder à vos données.',
+      [
+        { text: 'Annuler', style: 'cancel' },
+        {
+          text: 'Se déconnecter',
+          style: 'destructive',
+          onPress: () => {
+            supabase.auth.signOut();
+          },
+        },
+      ]
+    );
   };
 
   if (loading) {
@@ -196,7 +221,15 @@ export default function ProfileScreen({ onOpenFavorites, onOpenReservations }: P
                 <Text style={styles.description}>{profile.bio ?? profile.description}</Text>
               ) : null}
 
-              {profile.website ? <Text style={styles.website}>{profile.website}</Text> : null}
+              {profile.website ? (
+                <TouchableOpacity
+                  onPress={() => openWebsite(profile.website!)}
+                  accessibilityRole="link"
+                  accessibilityLabel={`Ouvrir ${profile.website}`}
+                >
+                  <Text style={styles.website}>{profile.website}</Text>
+                </TouchableOpacity>
+              ) : null}
 
               {typeof profile.bookmarks_count === 'number' ? (
                 <View style={styles.statsRow}>
@@ -295,6 +328,8 @@ export default function ProfileScreen({ onOpenFavorites, onOpenReservations }: P
                 )}
               </TouchableOpacity>
 
+              {error ? <Text style={styles.error}>{error}</Text> : null}
+
               <TouchableOpacity
                 onPress={() => {
                   setEditing(false);
@@ -330,7 +365,7 @@ export default function ProfileScreen({ onOpenFavorites, onOpenReservations }: P
             ) : null}
           </View>
 
-          <TouchableOpacity style={styles.signOutButton} onPress={handleSignOut}>
+          <TouchableOpacity style={styles.signOutButton} onPress={handleSignOut} accessibilityRole="button" accessibilityLabel="Se déconnecter">
             <Text style={styles.signOutText}>Se déconnecter</Text>
           </TouchableOpacity>
         </View>
@@ -340,66 +375,66 @@ export default function ProfileScreen({ onOpenFavorites, onOpenReservations }: P
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f9fafb', padding: 16 },
+  container: { flex: 1, backgroundColor: colors.background, padding: 16 },
   scroll: { paddingBottom: 24 },
-  card: { backgroundColor: '#fff', borderRadius: 20, padding: 24, borderWidth: 1, borderColor: '#e5e7eb' },
+  card: { backgroundColor: colors.surface, borderRadius: radius.xl, padding: 24, borderWidth: 1, borderColor: colors.border },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24 },
   avatar: { width: 100, height: 100, borderRadius: 50, marginBottom: 16, alignSelf: 'center' },
-  avatarPlaceholder: { width: 100, height: 100, borderRadius: 50, backgroundColor: '#e5e7eb', alignItems: 'center', justifyContent: 'center', marginBottom: 16, alignSelf: 'center' },
-  name: { fontSize: 22, fontWeight: '700', color: '#111827', textAlign: 'center' },
-  handle: { fontSize: 14, color: '#6b7280' },
+  avatarPlaceholder: { width: 100, height: 100, borderRadius: 50, backgroundColor: colors.border, alignItems: 'center', justifyContent: 'center', marginBottom: 16, alignSelf: 'center' },
+  name: { fontSize: 22, fontWeight: '700', color: colors.textPrimary, textAlign: 'center' },
+  handle: { fontSize: 14, color: colors.textSecondary },
   handleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, marginTop: 4 },
-  description: { color: '#374151', fontSize: 15, lineHeight: 22, marginTop: 12, textAlign: 'center' },
-  website: { color: '#2563eb', fontSize: 15, marginTop: 8, textAlign: 'center' },
+  description: { color: colors.textStrong, fontSize: 15, lineHeight: 22, marginTop: 12, textAlign: 'center' },
+  website: { color: colors.primary, fontSize: 15, marginTop: 8, textAlign: 'center' },
   statsRow: { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'center', gap: 6, marginTop: 16 },
-  statsValue: { fontSize: 20, fontWeight: '700', color: '#111827' },
-  statsLabel: { color: '#6b7280', fontSize: 13 },
-  editTitle: { fontSize: 17, fontWeight: '700', color: '#111827', textAlign: 'center', marginBottom: 16 },
+  statsValue: { fontSize: 20, fontWeight: '700', color: colors.textPrimary },
+  statsLabel: { color: colors.textSecondary, fontSize: 13 },
+  editTitle: { fontSize: 17, fontWeight: '700', color: colors.textPrimary, textAlign: 'center', marginBottom: 16 },
   input: {
     borderWidth: 1,
-    borderColor: '#d1d5db',
-    borderRadius: 12,
+    borderColor: colors.borderStrong,
+    borderRadius: radius.md,
     paddingHorizontal: 12,
     paddingVertical: 10,
-    backgroundColor: '#f8fafc',
+    backgroundColor: colors.inputBg,
     marginBottom: 12,
-    color: '#111827',
+    color: colors.textPrimary,
   },
   bioInput: { minHeight: 80, textAlignVertical: 'top' },
   actionButton: {
     paddingVertical: 12,
-    borderRadius: 12,
+    borderRadius: radius.md,
     alignItems: 'center',
     marginTop: 8,
   },
   actionButtonInner: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  editButton: { backgroundColor: '#2563eb' },
-  editButtonText: { color: '#fff', fontWeight: '600' },
-  favoritesButton: { backgroundColor: '#fff', borderWidth: 1, borderColor: '#2563eb' },
-  favoritesButtonText: { color: '#2563eb', fontWeight: '600' },
-  reservationsButton: { backgroundColor: '#fff', borderWidth: 1, borderColor: '#2563eb' },
-  reservationsButtonText: { color: '#2563eb', fontWeight: '600' },
-  photoButton: { backgroundColor: '#f3f4f6' },
-  photoButtonText: { color: '#374151', fontWeight: '600' },
-  saveButton: { backgroundColor: '#2563eb' },
-  saveButtonText: { color: '#fff', fontWeight: '700' },
-  cancelText: { color: '#6b7280', textAlign: 'center', marginTop: 14, paddingVertical: 8 },
-  success: { color: '#16a34a', textAlign: 'center', marginTop: 14 },
+  editButton: { backgroundColor: colors.primary },
+  editButtonText: { color: colors.surface, fontWeight: '600' },
+  favoritesButton: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.primary },
+  favoritesButtonText: { color: colors.primary, fontWeight: '600' },
+  reservationsButton: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.primary },
+  reservationsButtonText: { color: colors.primary, fontWeight: '600' },
+  photoButton: { backgroundColor: colors.chipBg },
+  photoButtonText: { color: colors.textStrong, fontWeight: '600' },
+  saveButton: { backgroundColor: colors.primary },
+  saveButtonText: { color: colors.surface, fontWeight: '700' },
+  cancelText: { color: colors.textSecondary, textAlign: 'center', marginTop: 14, paddingVertical: 8 },
+  success: { color: colors.success, textAlign: 'center', marginTop: 14 },
   infoBlock: { marginTop: 18 },
-  infoRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 10, borderTopWidth: 1, borderColor: '#f3f4f6' },
-  infoLabel: { color: '#6b7280' },
-  infoValue: { color: '#111827', fontWeight: '600' },
-  error: { color: '#dc2626', textAlign: 'center' },
-  empty: { color: '#6b7280', textAlign: 'center' },
+  infoRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 10, borderTopWidth: 1, borderColor: colors.chipBg },
+  infoLabel: { color: colors.textSecondary },
+  infoValue: { color: colors.textPrimary, fontWeight: '600' },
+  error: { color: colors.danger, textAlign: 'center' },
+  empty: { color: colors.textSecondary, textAlign: 'center' },
   signOutButton: {
     marginTop: 20,
-    backgroundColor: '#ef4444',
+    backgroundColor: colors.like,
     paddingVertical: 14,
-    borderRadius: 12,
+    borderRadius: radius.md,
     alignItems: 'center',
   },
   signOutText: {
-    color: '#fff',
+    color: colors.surface,
     fontWeight: '700',
   },
 });

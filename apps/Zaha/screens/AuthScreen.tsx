@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import { supabase } from '../lib/supabase';
 import FontIcon from '../components/FontIcon';
+import { colors, radius } from '../theme';
 
 interface AuthScreenProps {
   onAuthSuccess: () => void;
@@ -43,28 +44,31 @@ export default function AuthScreen({ onAuthSuccess }: AuthScreenProps) {
   const [password, setPassword] = useState('');
   const [mode, setMode] = useState<'signIn' | 'signUp'>('signIn');
   const [loading, setLoading] = useState(false);
-  const [message, setMessage] = useState<string | null>(null);
+  const [feedback, setFeedback] = useState<{ text: string; kind: 'error' | 'success' } | null>(null);
   const [showPassword, setShowPassword] = useState(false);
 
   const handleSubmit = async () => {
     if (!email.trim() || !password.trim()) {
-      setMessage('Email et mot de passe sont requis.');
+      setFeedback({ text: 'Email et mot de passe sont requis.', kind: 'error' });
       return;
     }
 
     if (!supabase) {
-      setMessage('Supabase n’est pas configuré. Vérifie les variables d’environnement.');
+      setFeedback({
+        text: 'Supabase n’est pas configuré. Vérifie les variables d’environnement.',
+        kind: 'error',
+      });
       return;
     }
 
     setLoading(true);
-    setMessage(null);
+    setFeedback(null);
 
     try {
       if (mode === 'signUp') {
         const { data, error } = await supabase.auth.signUp({ email, password });
         if (error) {
-          setMessage(translateAuthError(error.message));
+          setFeedback({ text: translateAuthError(error.message), kind: 'error' });
           return;
         }
 
@@ -73,25 +77,69 @@ export default function AuthScreen({ onAuthSuccess }: AuthScreenProps) {
           return;
         }
 
-        setMessage('Compte créé. Vérifiez votre email ou désactivez la confirmation pour le mode dev.');
+        setFeedback({
+          text: 'Compte créé. Vérifiez votre email ou désactivez la confirmation pour le mode dev.',
+          kind: 'success',
+        });
         return;
       }
 
       const { error, data } = await supabase.auth.signInWithPassword({ email, password });
       if (error) {
-        setMessage(translateAuthError(error.message));
+        setFeedback({ text: translateAuthError(error.message), kind: 'error' });
         return;
       }
 
       if (data.session) {
         onAuthSuccess();
       } else {
-        setMessage('Connexion impossible. Vérifiez votre email et votre mot de passe.');
+        setFeedback({
+          text: 'Connexion impossible. Vérifiez votre email et votre mot de passe.',
+          kind: 'error',
+        });
       }
     } catch (error) {
-      setMessage(
-        error instanceof Error ? translateAuthError(error.message) : 'Erreur de connexion'
-      );
+      setFeedback({
+        text: error instanceof Error ? translateAuthError(error.message) : 'Erreur de connexion',
+        kind: 'error',
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleForgotPassword = async () => {
+    if (!supabase) {
+      setFeedback({
+        text: 'Supabase n’est pas configuré. Vérifie les variables d’environnement.',
+        kind: 'error',
+      });
+      return;
+    }
+    if (!email.trim()) {
+      setFeedback({ text: 'Renseignez votre email pour recevoir le lien de réinitialisation.', kind: 'error' });
+      return;
+    }
+    setLoading(true);
+    setFeedback(null);
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(email.trim());
+      if (error) {
+        setFeedback({ text: translateAuthError(error.message), kind: 'error' });
+        return;
+      }
+      setFeedback({
+        text: 'Un lien de réinitialisation vous a été envoyé par email.',
+        kind: 'success',
+      });
+    } catch (error) {
+      setFeedback({
+        text:
+          error instanceof Error
+            ? translateAuthError(error.message)
+            : 'Une erreur est survenue. Veuillez réessayer.',
+        kind: 'error',
+      });
     } finally {
       setLoading(false);
     }
@@ -112,6 +160,8 @@ export default function AuthScreen({ onAuthSuccess }: AuthScreenProps) {
             placeholder="Email"
             keyboardType="email-address"
             autoCapitalize="none"
+            autoComplete="email"
+            textContentType="emailAddress"
             value={email}
             onChangeText={setEmail}
           />
@@ -121,6 +171,8 @@ export default function AuthScreen({ onAuthSuccess }: AuthScreenProps) {
               placeholder="Mot de passe"
               secureTextEntry={!showPassword}
               autoCapitalize="none"
+              autoComplete={mode === 'signUp' ? 'new-password' : 'current-password'}
+              textContentType={mode === 'signUp' ? 'newPassword' : 'password'}
               value={password}
               onChangeText={setPassword}
             />
@@ -139,7 +191,21 @@ export default function AuthScreen({ onAuthSuccess }: AuthScreenProps) {
             </TouchableOpacity>
           </View>
 
-          {message ? <Text style={styles.message}>{message}</Text> : null}
+          {mode === 'signIn' ? (
+            <TouchableOpacity
+              onPress={handleForgotPassword}
+              accessibilityRole="button"
+              accessibilityLabel="Mot de passe oublié"
+            >
+              <Text style={styles.forgotLink}>Mot de passe oublié ?</Text>
+            </TouchableOpacity>
+          ) : null}
+
+          {feedback ? (
+            <Text style={[styles.message, feedback.kind === 'success' && styles.messageSuccess]}>
+              {feedback.text}
+            </Text>
+          ) : null}
 
           <TouchableOpacity
             style={styles.button}
@@ -174,19 +240,21 @@ export default function AuthScreen({ onAuthSuccess }: AuthScreenProps) {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#f9fafb', padding: 16 },
+  container: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.background, padding: 16 },
   keyboardAvoiding: { flex: 1, justifyContent: 'center', alignItems: 'center', width: '100%' },
-  card: { width: '100%', backgroundColor: '#fff', borderRadius: 20, padding: 24, shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 20, elevation: 5 },
-  title: { fontSize: 24, fontWeight: '700', color: '#111827', marginBottom: 8 },
-  subtitle: { color: '#6b7280', marginBottom: 24, lineHeight: 20 },
-  input: { borderWidth: 1, borderColor: '#d1d5db', borderRadius: 14, padding: 14, marginBottom: 12, backgroundColor: '#f8fafc' },
+  card: { width: '100%', backgroundColor: colors.surface, borderRadius: radius.xl, padding: 24, shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 20, elevation: 5 },
+  title: { fontSize: 24, fontWeight: '700', color: colors.textPrimary, marginBottom: 8 },
+  subtitle: { color: colors.textSecondary, marginBottom: 24, lineHeight: 20 },
+  input: { borderWidth: 1, borderColor: colors.borderStrong, borderRadius: 14, padding: 14, marginBottom: 12, backgroundColor: colors.inputBg },
 passwordWrapper: { width: '100%' },
   passwordInput: { paddingRight: 48 },
   eyeButton: { position: 'absolute', right: 12, top: 0, bottom: 0, justifyContent: 'center' },
-  button: { backgroundColor: '#2563eb', borderRadius: 14, paddingVertical: 14, alignItems: 'center', marginTop: 8 },
-  buttonText: { color: '#fff', fontWeight: '700' },
+  button: { backgroundColor: colors.primary, borderRadius: 14, paddingVertical: 14, alignItems: 'center', marginTop: 8 },
+  buttonText: { color: colors.surface, fontWeight: '700' },
   switchRow: { flexDirection: 'row', justifyContent: 'center', gap: 6, marginTop: 16 },
-  switchText: { color: '#6b7280' },
-  switchAction: { color: '#2563eb', fontWeight: '700' },
-  message: { color: '#dc2626', marginBottom: 12 },
+  switchText: { color: colors.textSecondary },
+  switchAction: { color: colors.primary, fontWeight: '700' },
+  message: { color: colors.danger, marginBottom: 12 },
+  messageSuccess: { color: colors.success },
+  forgotLink: { color: colors.primary, fontWeight: '600', textAlign: 'right', marginBottom: 12 },
 });

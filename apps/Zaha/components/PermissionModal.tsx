@@ -35,7 +35,6 @@ export default function PermissionModal({ visible, onClose }: Props) {
     try {
       if (Platform.OS === 'android') {
         const results = await PermissionsAndroid.requestMultiple([
-          PermissionsAndroid.PERMISSIONS.CAMERA,
           PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
           PermissionsAndroid.PERMISSIONS.ACCESS_COARSE_LOCATION,
         ]);
@@ -49,8 +48,7 @@ export default function PermissionModal({ visible, onClose }: Props) {
           return;
         }
       } else {
-        // iOS : la géolocalisation passe par la demande native de la lib ;
-        // la caméra ne nécessite pas de permission système via cette lib.
+        // iOS : la géolocalisation passe par la demande native de la lib.
         try {
           Geolocation.requestAuthorization(() => {}, () => {});
         } catch {
@@ -105,13 +103,8 @@ export default function PermissionModal({ visible, onClose }: Props) {
             <>
               <Text style={styles.title}>Autorisations nécessaires</Text>
               <Text style={styles.message}>
-                Pour améliorer votre expérience, Zaha souhaite accéder à votre appareil photo et à
-                votre position.
+                Pour améliorer votre expérience, Zaha souhaite accéder à votre position.
               </Text>
-              <View style={styles.permissionRow}>
-                <FontIcon name="camera" width={20} height={20} fill="#2563eb" />
-                <Text style={styles.permissionLabel}>Appareil photo</Text>
-              </View>
               <View style={styles.permissionRow}>
                 <FontIcon name="location-dot" width={20} height={20} fill="#2563eb" />
                 <Text style={styles.permissionLabel}>Position</Text>

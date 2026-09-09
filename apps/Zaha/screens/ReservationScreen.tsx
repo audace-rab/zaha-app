@@ -12,7 +12,9 @@ import {
 import DateTimePicker, { type DateTimePickerEvent } from '@react-native-community/datetimepicker';
 import { supabase } from '../lib/supabase';
 import { api } from '../lib/api';
+import { formatDateDisplay } from '../lib/format';
 import FontIcon, { type FontIconName } from '../components/FontIcon';
+import { colors, radius } from '../theme';
 
 const DEMO_USER_ID = 'a1000000-0000-0000-0000-000000000001';
 
@@ -50,9 +52,6 @@ function deriveType(category?: string): ReservationType {
 
 const formatDateISO = (d: Date) =>
   `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-
-const formatDateDisplay = (d: Date) =>
-  `${String(d.getDate()).padStart(2, '0')}-${String(d.getMonth() + 1).padStart(2, '0')}-${d.getFullYear()}`;
 
 const formatTime = (d: Date) =>
   `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
@@ -113,6 +112,7 @@ export default function ReservationScreen({ place, onDone }: ReservationScreenPr
   };
 
   const handleSubmit = async () => {
+    if (!formValid) return;
     setLoading(true);
     setError(null);
     try {
@@ -123,7 +123,7 @@ export default function ReservationScreen({ place, onDone }: ReservationScreenPr
         date: formatDateISO(dateObj),
         timeStart: formatTime(timeStartObj),
         timeEnd: formatTime(timeEndObj),
-        guests: parseInt(guests, 10) || 1,
+        guests: guestsInt || 1,
         roomType: reservationType === 'hotel' ? roomType || undefined : undefined,
         activitySlot: reservationType === 'activity' ? activitySlot || undefined : undefined,
         note: note.trim() || undefined,
@@ -135,6 +135,25 @@ export default function ReservationScreen({ place, onDone }: ReservationScreenPr
       setLoading(false);
     }
   };
+
+  const guestsInt = parseInt(guests, 10);
+  const guestsValid = !Number.isNaN(guestsInt) && guestsInt >= 1 && guestsInt <= 50;
+  const guestsError = !guests.trim() || !guestsValid
+    ? 'Le nombre de convives doit être entre 1 et 50.'
+    : null;
+
+  const timeError = formatTime(timeEndObj) <= formatTime(timeStartObj)
+    ? 'L\u2019heure de fin doit être après l\u2019heure de début.'
+    : null;
+
+  const roomError = reservationType === 'hotel' && !roomType
+    ? 'Sélectionnez un type de chambre.'
+    : null;
+  const slotError = reservationType === 'activity' && !activitySlot
+    ? 'Sélectionnez un créneau.'
+    : null;
+
+  const formValid = !guestsError && !timeError && !roomError && !slotError;
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
@@ -213,8 +232,8 @@ export default function ReservationScreen({ place, onDone }: ReservationScreenPr
         </View>
       </View>
 
-      {/* Nombre de convives */}
-      <Text style={styles.label}>Nombre de convives / participants</Text>
+      {/* Numéro de convives */}
+      <Text style={styles.label}>Nombre de convives / participants *</Text>
       <TextInput
         style={styles.input}
         value={guests}
@@ -223,11 +242,14 @@ export default function ReservationScreen({ place, onDone }: ReservationScreenPr
         keyboardType="numeric"
         maxLength={3}
       />
+      {guestsError ? <Text style={styles.errorInline}>{guestsError}</Text> : null}
+
+      {timeError ? <Text style={styles.errorInline}>{timeError}</Text> : null}
 
       {/* Type de chambre (si hôtel) */}
       {reservationType === 'hotel' && (
         <>
-          <Text style={styles.label}>Type de chambre</Text>
+          <Text style={styles.label}>Type de chambre *</Text>
           <View style={styles.typeRow}>
             {ROOM_TYPES.map((rt) => (
               <TouchableOpacity
@@ -242,13 +264,14 @@ export default function ReservationScreen({ place, onDone }: ReservationScreenPr
               </TouchableOpacity>
             ))}
           </View>
+          {roomError ? <Text style={styles.errorInline}>{roomError}</Text> : null}
         </>
       )}
 
       {/* Créneau d'activité */}
       {reservationType === 'activity' && (
         <>
-          <Text style={styles.label}>Créneau</Text>
+          <Text style={styles.label}>Créneau *</Text>
           <View style={styles.typeRow}>
             {ACTIVITY_SLOTS.map((slot) => (
               <TouchableOpacity
@@ -263,6 +286,7 @@ export default function ReservationScreen({ place, onDone }: ReservationScreenPr
               </TouchableOpacity>
             ))}
           </View>
+          {slotError ? <Text style={styles.errorInline}>{slotError}</Text> : null}
         </>
       )}
 
@@ -280,14 +304,47 @@ export default function ReservationScreen({ place, onDone }: ReservationScreenPr
 
       {error ? <Text style={styles.error}>{error}</Text> : null}
 
+      {/* Récapitulatif */}
+      <View style={styles.recap}>
+        <Text style={styles.recapTitle}>Récapitulatif</Text>
+        <View style={styles.recapRow}>
+          <Text style={styles.recapLabel}>Lieu</Text>
+          <Text style={styles.recapValue}>{place.name}</Text>
+        </View>
+        <View style={styles.recapRow}>
+          <Text style={styles.recapLabel}>Date</Text>
+          <Text style={styles.recapValue}>{formatDateDisplay(dateObj)}</Text>
+        </View>
+        <View style={styles.recapRow}>
+          <Text style={styles.recapLabel}>Horaires</Text>
+          <Text style={styles.recapValue}>{formatTime(timeStartObj)} – {formatTime(timeEndObj)}</Text>
+        </View>
+        <View style={styles.recapRow}>
+          <Text style={styles.recapLabel}>Convives</Text>
+          <Text style={styles.recapValue}>{guestsInt || 1}</Text>
+        </View>
+        {reservationType === 'hotel' && roomType ? (
+          <View style={styles.recapRow}>
+            <Text style={styles.recapLabel}>Type de chambre</Text>
+            <Text style={styles.recapValue}>{roomType}</Text>
+          </View>
+        ) : null}
+        {reservationType === 'activity' && activitySlot ? (
+          <View style={styles.recapRow}>
+            <Text style={styles.recapLabel}>Créneau</Text>
+            <Text style={styles.recapValue}>{activitySlot}</Text>
+          </View>
+        ) : null}
+      </View>
+
       <View style={styles.actions}>
         <TouchableOpacity style={styles.cancelBtn} onPress={onDone} accessibilityRole="button" accessibilityLabel="Annuler">
           <Text style={styles.cancelBtnText}>Annuler</Text>
         </TouchableOpacity>
         <TouchableOpacity
-          style={[styles.submitBtn, loading && styles.submitBtnDisabled]}
+          style={[styles.submitBtn, (!formValid || loading) && styles.submitBtnDisabled]}
           onPress={handleSubmit}
-          disabled={loading}
+          disabled={!formValid || loading}
           accessibilityRole="button"
           accessibilityLabel="Confirmer la réservation"
         >
@@ -303,12 +360,12 @@ export default function ReservationScreen({ place, onDone }: ReservationScreenPr
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f9fafb' },
+  container: { flex: 1, backgroundColor: colors.background },
   content: { padding: 16, paddingBottom: 40, gap: 8 },
-  placeName: { fontSize: 18, fontWeight: '700', color: '#111827', marginBottom: 2 },
+  placeName: { fontSize: 18, fontWeight: '700', color: colors.textPrimary, marginBottom: 2 },
   placeNameRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  placeAddress: { color: '#6b7280', fontSize: 14, marginBottom: 12 },
-  label: { fontSize: 14, fontWeight: '600', color: '#374151', marginTop: 12, marginBottom: 6 },
+  placeAddress: { color: colors.textSecondary, fontSize: 14, marginBottom: 12 },
+  label: { fontSize: 14, fontWeight: '600', color: colors.textStrong, marginTop: 12, marginBottom: 6 },
   typeBadge: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -316,23 +373,23 @@ const styles = StyleSheet.create({
     gap: 6,
     paddingHorizontal: 12,
     paddingVertical: 7,
-    borderRadius: 20,
-    backgroundColor: '#eff6ff',
+    borderRadius: radius.xl,
+    backgroundColor: colors.primarySoft,
     borderWidth: 1,
-    borderColor: '#bfdbfe',
+    borderColor: colors.primaryBorder,
     marginBottom: 4,
   },
-  typeBadgeText: { fontSize: 13, color: '#1d4ed8', fontWeight: '600' },
+  typeBadgeText: { fontSize: 13, color: colors.primaryDark, fontWeight: '600' },
   input: {
     borderWidth: 1,
-    borderColor: '#d1d5db',
-    borderRadius: 12,
+    borderColor: colors.borderStrong,
+    borderRadius: radius.md,
     paddingHorizontal: 12,
     paddingVertical: 10,
-    backgroundColor: '#fff',
+    backgroundColor: colors.surface,
     fontSize: 15,
   },
-  dateText: { fontSize: 15, color: '#111827' },
+  dateText: { fontSize: 15, color: colors.textPrimary },
   dateTextRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   inputMultiline: { minHeight: 72, textAlignVertical: 'top' },
   row: { flexDirection: 'row', gap: 12 },
@@ -344,34 +401,48 @@ const styles = StyleSheet.create({
     gap: 4,
     paddingHorizontal: 12,
     paddingVertical: 8,
-    borderRadius: 20,
-    backgroundColor: '#f3f4f6',
+    borderRadius: radius.xl,
+    backgroundColor: colors.chipBg,
     borderWidth: 1,
-    borderColor: '#e5e7eb',
+    borderColor: colors.border,
   },
-  typeChipActive: { backgroundColor: '#2563eb', borderColor: '#2563eb' },
+  typeChipActive: { backgroundColor: colors.primary, borderColor: colors.primary },
   typeChipIcon: { fontSize: 14 },
-  typeChipText: { fontSize: 13, color: '#374151', fontWeight: '500' },
-  typeChipTextActive: { color: '#fff' },
-  error: { color: '#dc2626', fontSize: 13, marginTop: 8 },
+  typeChipText: { fontSize: 13, color: colors.textStrong, fontWeight: '500' },
+  typeChipTextActive: { color: colors.surface },
+  error: { color: colors.danger, fontSize: 13, marginTop: 8 },
+  errorInline: { color: colors.danger, fontSize: 13, marginTop: 4 },
+  recap: {
+    marginTop: 20,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    padding: 14,
+    gap: 8,
+  },
+  recapTitle: { fontSize: 15, fontWeight: '700', color: colors.textPrimary, marginBottom: 2 },
+  recapRow: { flexDirection: 'row', justifyContent: 'space-between', gap: 12 },
+  recapLabel: { color: colors.textSecondary, fontSize: 14 },
+  recapValue: { color: colors.textPrimary, fontSize: 14, fontWeight: '600', flexShrink: 1, textAlign: 'right' },
   actions: { flexDirection: 'row', gap: 10, marginTop: 20 },
   cancelBtn: {
     flex: 1,
     paddingVertical: 14,
-    borderRadius: 12,
+    borderRadius: radius.md,
     borderWidth: 1,
-    borderColor: '#d1d5db',
-    backgroundColor: '#fff',
+    borderColor: colors.borderStrong,
+    backgroundColor: colors.surface,
     alignItems: 'center',
   },
-  cancelBtnText: { color: '#6b7280', fontWeight: '600' },
+  cancelBtnText: { color: colors.textSecondary, fontWeight: '600' },
   submitBtn: {
     flex: 2,
     paddingVertical: 14,
-    borderRadius: 12,
-    backgroundColor: '#2563eb',
+    borderRadius: radius.md,
+    backgroundColor: colors.primary,
     alignItems: 'center',
   },
   submitBtnDisabled: { opacity: 0.5 },
-  submitBtnText: { color: '#fff', fontWeight: '700' },
+  submitBtnText: { color: colors.surface, fontWeight: '700' },
 });

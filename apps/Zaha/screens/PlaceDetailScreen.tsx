@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   FlatList,
   Image,
   Linking,
@@ -17,9 +18,8 @@ import MapView, { Marker } from 'react-native-maps';
 import { api } from '../lib/api';
 import { supabase } from '../lib/supabase';
 import ReservationScreen from './ReservationScreen';
-import ShareIcon from '../components/ShareIcon';
-import RouteIcon from '../components/RouteIcon';
 import FontIcon from '../components/FontIcon';
+import { colors, radius } from '../theme';
 
 const DEMO_USER_ID = 'a1000000-0000-0000-0000-000000000001';
 
@@ -73,6 +73,7 @@ export default function PlaceDetailScreen({ place }: PlaceDetailScreenProps) {
   const [formSubmitting, setFormSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const [showReservation, setShowReservation] = useState(false);
+  const [reservationSuccess, setReservationSuccess] = useState(false);
   const { width: screenWidth } = useWindowDimensions();
 
   // Galerie : photos[] si disponible, complétée par photoUrl (déduupliquée).
@@ -98,6 +99,7 @@ export default function PlaceDetailScreen({ place }: PlaceDetailScreenProps) {
     setFormComment('');
     setFormSubmitting(false);
     setFormError(null);
+    setReservationSuccess(false);
   }, [place?.id]);
 
   // Charger les reviews du lieu.
@@ -188,6 +190,33 @@ export default function PlaceDetailScreen({ place }: PlaceDetailScreenProps) {
     );
   }
 
+  // Feedback réservation (auto-effacé).
+  useEffect(() => {
+    if (!reservationSuccess) return;
+    const timer = setTimeout(() => setReservationSuccess(false), 4000);
+    return () => clearTimeout(timer);
+  }, [reservationSuccess]);
+
+  const openPhone = async () => {
+    if (!place.phoneNumber) return;
+    const tel = `tel:${place.phoneNumber.replace(/[^+\d]/g, '')}`;
+    try {
+      await Linking.openURL(tel);
+    } catch {
+      Alert.alert('Impossible', 'Aucune application ne peut passer cet appel.');
+    }
+  };
+
+  const openWebsite = async () => {
+    if (!place.websiteUri) return;
+    const url = place.websiteUri.startsWith('http') ? place.websiteUri : `https://${place.websiteUri}`;
+    try {
+      await Linking.openURL(url);
+    } catch {
+      Alert.alert('Impossible', 'Aucune application ne peut ouvrir ce site.');
+    }
+  };
+
   const openInMaps = async () => {
     let url = place.googleMapsUri;
     if (!url && place.location) {
@@ -232,7 +261,10 @@ export default function PlaceDetailScreen({ place }: PlaceDetailScreenProps) {
         <View style={styles.reservationOverlay}>
           <ReservationScreen
             place={{ id: place.id, name: place.name, category: place.category, address: place.address }}
-            onDone={() => setShowReservation(false)}
+            onDone={() => {
+              setShowReservation(false);
+              setReservationSuccess(true);
+            }}
           />
         </View>
       ) : (
@@ -293,6 +325,13 @@ export default function PlaceDetailScreen({ place }: PlaceDetailScreenProps) {
       )}
 
       <View style={styles.body}>
+        {reservationSuccess && (
+          <View style={styles.reservationBanner}>
+            <FontIcon name="check" width={16} height={16} fill="#16a34a" />
+            <Text style={styles.reservationBannerText}>Réservation envoyée</Text>
+          </View>
+        )}
+
         <View style={styles.titleRow}>
           {place.isPro && <Text style={styles.proBadge}>PRO</Text>}
           <Text style={styles.name}>{place.name}</Text>
@@ -307,11 +346,11 @@ export default function PlaceDetailScreen({ place }: PlaceDetailScreenProps) {
             style={styles.mapsButton}
             onPress={openInMaps}
             accessibilityRole="link"
-            accessibilityLabel="Ouvrir dans Google Maps"
+            accessibilityLabel="Voir la fiche Google Maps du lieu"
           >
             <View style={styles.iconButtonContent}>
               <FontIcon name="globe" width={16} height={16} fill="#2563eb" />
-              <Text style={styles.mapsButtonText}>Ouvrir dans Google Maps</Text>
+              <Text style={styles.mapsButtonText}>Voir la fiche Google</Text>
             </View>
           </TouchableOpacity>
         ) : place.address ? (
@@ -324,10 +363,30 @@ export default function PlaceDetailScreen({ place }: PlaceDetailScreenProps) {
           </View>
         ) : null}
         {place.phoneNumber ? (
-          <View style={styles.lineIconRow}>
+          <TouchableOpacity
+            style={styles.lineIconRow}
+            onPress={openPhone}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            accessibilityRole="link"
+            accessibilityLabel={`Appeler ${place.phoneNumber}`}
+          >
             <FontIcon name="phone" width={14} height={14} fill="#374151" />
-            <Text style={styles.line}>{place.phoneNumber}</Text>
-          </View>
+            <Text style={[styles.line, styles.linkLine]}>{place.phoneNumber}</Text>
+          </TouchableOpacity>
+        ) : null}
+        {place.websiteUri ? (
+          <TouchableOpacity
+            style={styles.lineIconRow}
+            onPress={openWebsite}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            accessibilityRole="link"
+            accessibilityLabel="Ouvrir le site web"
+          >
+            <FontIcon name="globe" width={14} height={14} fill="#374151" />
+            <Text style={[styles.line, styles.linkLine]} numberOfLines={1}>
+              {place.websiteUri.replace(/^https?:\/\//, '')}
+            </Text>
+          </TouchableOpacity>
         ) : null}
         {place.snippet ? <Text style={styles.snippet}>{place.snippet}</Text> : null}
 
@@ -394,7 +453,7 @@ export default function PlaceDetailScreen({ place }: PlaceDetailScreenProps) {
             accessibilityLabel="Partager ce lieu"
           >
             <View style={styles.shareButtonContent}>
-              <ShareIcon width={18} height={18} fill="#2563eb" />
+              <FontIcon name="share" width={18} height={18} fill="#2563eb" />
               <Text
                 style={styles.shareButtonText}
                 numberOfLines={1}
@@ -442,7 +501,7 @@ export default function PlaceDetailScreen({ place }: PlaceDetailScreenProps) {
               }
             >
               <View style={styles.directionsButtonContent}>
-                <RouteIcon width={16} height={16} fill="#fff" />
+                <FontIcon name="route" width={16} height={16} fill="#fff" />
                 <Text style={styles.mapDirectionsButtonText}>Itinéraire</Text>
               </View>
             </TouchableOpacity>
@@ -511,8 +570,11 @@ export default function PlaceDetailScreen({ place }: PlaceDetailScreenProps) {
                   <TouchableOpacity
                     key={star}
                     onPress={() => setFormRating(star)}
+                    style={styles.starButton}
+                    hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}
                     accessibilityRole="button"
                     accessibilityLabel={`${star} étoile${star > 1 ? 's' : ''}`}
+                    accessibilityState={{ selected: star <= formRating }}
                   >
                     <Text style={[styles.star, star <= formRating && styles.starActive]}>
                       ★
@@ -547,9 +609,11 @@ export default function PlaceDetailScreen({ place }: PlaceDetailScreenProps) {
                   onPress={handleSubmitReview}
                   disabled={formRating < 1 || formSubmitting}
                 >
-                  <Text style={styles.reviewFormSubmitText}>
-                    {formSubmitting ? '…' : 'Publier'}
-                  </Text>
+                  {formSubmitting ? (
+                    <ActivityIndicator size="small" color="#fff" />
+                  ) : (
+                    <Text style={styles.reviewFormSubmitText}>Publier</Text>
+                  )}
                 </TouchableOpacity>
               </View>
             </View>
@@ -602,15 +666,15 @@ export default function PlaceDetailScreen({ place }: PlaceDetailScreenProps) {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f9fafb' },
-  scrollView: { flex: 1, backgroundColor: '#f9fafb' },
-  reservationOverlay: { flex: 1, backgroundColor: '#f9fafb' },
+  container: { flex: 1, backgroundColor: colors.background },
+  scrollView: { flex: 1, backgroundColor: colors.background },
+  reservationOverlay: { flex: 1, backgroundColor: colors.background },
   content: { paddingBottom: 24 },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24, gap: 16 },
-  emptyTitle: { color: '#6b7280', fontSize: 15 },
+  emptyTitle: { color: colors.textSecondary, fontSize: 15 },
   photoHeader: { position: 'relative' },
   gallery: { position: 'relative' },
-  photo: { width: '100%', height: 240, backgroundColor: '#e5e7eb' },
+  photo: { width: '100%', height: 240, backgroundColor: colors.border },
   photoLoading: {
     position: 'absolute',
     top: 0,
@@ -624,7 +688,7 @@ const styles = StyleSheet.create({
   detailMap: {
     width: '100%',
     height: 220,
-    borderRadius: 12,
+    borderRadius: radius.md,
     overflow: 'hidden',
     marginTop: 4,
   },
@@ -635,23 +699,23 @@ const styles = StyleSheet.create({
     position: 'absolute',
     bottom: 16,
     alignSelf: 'center',
-    backgroundColor: '#2563eb',
+    backgroundColor: colors.primary,
     paddingVertical: 10,
     paddingHorizontal: 18,
-    borderRadius: 12,
+    borderRadius: radius.md,
     shadowColor: '#000',
     shadowOpacity: 0.2,
     shadowRadius: 8,
     shadowOffset: { width: 0, height: 2 },
     elevation: 4,
   },
-  mapDirectionsButtonText: { color: '#fff', fontWeight: '700', fontSize: 14 },
+  mapDirectionsButtonText: { color: colors.surface, fontWeight: '700', fontSize: 14 },
   directionsButtonContent: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   body: { padding: 16, gap: 8 },
   titleRow: { flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' },
   proBadge: {
-    backgroundColor: '#2563eb',
-    color: '#fff',
+    backgroundColor: colors.primary,
+    color: colors.surface,
     fontSize: 11,
     fontWeight: '700',
     paddingHorizontal: 6,
@@ -659,30 +723,44 @@ const styles = StyleSheet.create({
     borderRadius: 4,
     overflow: 'hidden',
   },
-  name: { fontSize: 22, fontWeight: '700', color: '#111827', flexShrink: 1 },
-  rating: { color: '#ca8a04', fontWeight: '700', fontSize: 16 },
-  line: { color: '#374151', fontSize: 15 },
+  name: { fontSize: 22, fontWeight: '700', color: colors.textPrimary, flexShrink: 1 },
+  rating: { color: colors.rating, fontWeight: '700', fontSize: 16 },
+  line: { color: colors.textStrong, fontSize: 15 },
+  linkLine: { color: colors.primary },
   lineIconRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  mapsButton: {
-    backgroundColor: '#f0f9ff',
+  reservationBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: colors.successBg,
     borderWidth: 1,
-    borderColor: '#bfdbfe',
-    borderRadius: 12,
+    borderColor: colors.successBorder,
+    borderRadius: radius.md,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+  },
+  reservationBannerText: { color: colors.success, fontWeight: '600', fontSize: 14 },
+  mapsButton: {
+    backgroundColor: colors.primaryPale,
+    borderWidth: 1,
+    borderColor: colors.primaryBorder,
+    borderRadius: radius.md,
     paddingVertical: 12,
     paddingHorizontal: 16,
     alignItems: 'center',
   },
-  mapsButtonText: { color: '#2563eb', fontWeight: '600', fontSize: 14 },
-  snippet: { color: '#6b7280', fontSize: 15, lineHeight: 22, marginTop: 4 },
-  mapButtonText: { color: '#2563eb', fontWeight: '600', fontSize: 13, flexShrink: 1 },
-  mapButtonTextActive: { color: '#2563eb', fontWeight: '700' },
+  mapsButtonText: { color: colors.primary, fontWeight: '600', fontSize: 14 },
+  snippet: { color: colors.textSecondary, fontSize: 15, lineHeight: 22, marginTop: 4 },
+  mapButtonText: { color: colors.primary, fontWeight: '600', fontSize: 13, flexShrink: 1 },
+  mapButtonTextActive: { color: colors.primary, fontWeight: '700' },
   iconButtonContent: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 6,
   },
-  shareButtonText: { color: '#374151', fontWeight: '600', fontSize: 13 },
+  shareButtonText: { color: colors.textStrong, fontWeight: '600', fontSize: 13 },
   shareButtonContent: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -690,20 +768,20 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   reserveButton: {
-    backgroundColor: '#2563eb',
+    backgroundColor: colors.primary,
     paddingVertical: 14,
-    borderRadius: 12,
+    borderRadius: radius.md,
     alignItems: 'center',
     justifyContent: 'center',
     marginTop: 12,
   },
-  reserveButtonText: { color: '#fff', fontWeight: '700', fontSize: 15 },
+  reserveButtonText: { color: colors.surface, fontWeight: '700', fontSize: 15 },
   bookmarkButtonActive: {
-    borderColor: '#ef4444',
-    backgroundColor: '#fef2f2',
+    borderColor: colors.like,
+    backgroundColor: colors.likeSoft,
   },
-  bookmarkButtonText: { color: '#374151', fontWeight: '600', fontSize: 13, flexShrink: 1 },
-  bookmarkButtonTextActive: { color: '#ef4444', fontWeight: '700' },
+  bookmarkButtonText: { color: colors.textStrong, fontWeight: '600', fontSize: 13, flexShrink: 1 },
+  bookmarkButtonTextActive: { color: colors.like, fontWeight: '700' },
   actionsRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -717,16 +795,16 @@ const styles = StyleSheet.create({
     minWidth: 96,
     paddingVertical: 12,
     paddingHorizontal: 10,
-    borderRadius: 12,
+    borderRadius: radius.md,
     borderWidth: 1,
-    borderColor: '#e5e7eb',
-    backgroundColor: '#fff',
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
     alignItems: 'center',
     justifyContent: 'center',
   },
   mapButtonActive: {
-    backgroundColor: '#eff6ff',
-    borderColor: '#2563eb',
+    backgroundColor: colors.primarySoft,
+    borderColor: colors.primary,
   },
   dots: {
     position: 'absolute',
@@ -744,11 +822,11 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.5)',
   },
   dotActive: {
-    backgroundColor: '#fff',
+    backgroundColor: colors.surface,
   },
   reviewsSection: {
     borderTopWidth: 1,
-    borderTopColor: '#e5e7eb',
+    borderTopColor: colors.border,
     paddingTop: 16,
     marginTop: 16,
     gap: 12,
@@ -758,86 +836,87 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 10,
   },
-  reviewsTitle: { fontSize: 18, fontWeight: '700', color: '#111827' },
-  reviewsStats: { color: '#ca8a04', fontWeight: '600', fontSize: 14 },
-  reviewsEmpty: { color: '#9ca3af', fontSize: 14 },
+  reviewsTitle: { fontSize: 18, fontWeight: '700', color: colors.textPrimary },
+  reviewsStats: { color: colors.rating, fontWeight: '600', fontSize: 14 },
+  reviewsEmpty: { color: colors.textMuted, fontSize: 14 },
   reviewFormToggle: {
     borderWidth: 1,
-    borderColor: '#2563eb',
-    backgroundColor: '#eff6ff',
+    borderColor: colors.primary,
+    backgroundColor: colors.primarySoft,
     paddingVertical: 12,
-    borderRadius: 12,
+    borderRadius: radius.md,
     alignItems: 'center',
   },
-  reviewFormToggleText: { color: '#2563eb', fontWeight: '600', fontSize: 14 },
+  reviewFormToggleText: { color: colors.primary, fontWeight: '600', fontSize: 14 },
   reviewForm: {
-    backgroundColor: '#fff',
+    backgroundColor: colors.surface,
     borderWidth: 1,
-    borderColor: '#e5e7eb',
-    borderRadius: 12,
+    borderColor: colors.border,
+    borderRadius: radius.md,
     padding: 14,
     gap: 10,
   },
-  reviewFormLabel: { fontSize: 15, fontWeight: '600', color: '#111827' },
-  starsRow: { flexDirection: 'row', gap: 6 },
-  star: { fontSize: 28, color: '#d1d5db' },
-  starActive: { color: '#ca8a04' },
+  reviewFormLabel: { fontSize: 15, fontWeight: '600', color: colors.textPrimary },
+  starsRow: { flexDirection: 'row', gap: 2 },
+  starButton: { padding: 8, alignItems: 'center', justifyContent: 'center' },
+  star: { fontSize: 28, color: colors.borderStrong },
+  starActive: { color: colors.rating },
   reviewCommentInput: {
     borderWidth: 1,
-    borderColor: '#d1d5db',
-    borderRadius: 12,
+    borderColor: colors.borderStrong,
+    borderRadius: radius.md,
     padding: 10,
     fontSize: 14,
-    color: '#111827',
+    color: colors.textPrimary,
     minHeight: 72,
-    backgroundColor: '#f8fafc',
+    backgroundColor: colors.inputBg,
   },
-  reviewFormError: { color: '#dc2626', fontSize: 13 },
+  reviewFormError: { color: colors.danger, fontSize: 13 },
   reviewFormActions: { flexDirection: 'row', gap: 8 },
   reviewFormCancel: {
     flex: 1,
     borderWidth: 1,
-    borderColor: '#d1d5db',
-    backgroundColor: '#fff',
+    borderColor: colors.borderStrong,
+    backgroundColor: colors.surface,
     paddingVertical: 12,
-    borderRadius: 12,
+    borderRadius: radius.md,
     alignItems: 'center',
   },
-  reviewFormCancelText: { color: '#6b7280', fontWeight: '600', fontSize: 14 },
+  reviewFormCancelText: { color: colors.textSecondary, fontWeight: '600', fontSize: 14 },
   reviewFormSubmit: {
     flex: 1,
-    backgroundColor: '#2563eb',
+    backgroundColor: colors.primary,
     paddingVertical: 12,
-    borderRadius: 12,
+    borderRadius: radius.md,
     alignItems: 'center',
   },
   reviewFormSubmitDisabled: { opacity: 0.5 },
-  reviewFormSubmitText: { color: '#fff', fontWeight: '600', fontSize: 14 },
+  reviewFormSubmitText: { color: colors.surface, fontWeight: '600', fontSize: 14 },
   reviewsLoading: { paddingVertical: 16, alignItems: 'center' },
-  reviewsError: { color: '#dc2626', fontSize: 13 },
+  reviewsError: { color: colors.danger, fontSize: 13 },
   reviewCard: {
-    backgroundColor: '#fff',
+    backgroundColor: colors.surface,
     borderWidth: 1,
-    borderColor: '#e5e7eb',
-    borderRadius: 12,
+    borderColor: colors.border,
+    borderRadius: radius.md,
     padding: 12,
     gap: 8,
   },
   reviewCardHeader: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  reviewAvatar: { width: 36, height: 36, borderRadius: 18, backgroundColor: '#e5e7eb' },
+  reviewAvatar: { width: 36, height: 36, borderRadius: 18, backgroundColor: colors.border },
   reviewAvatarFallback: {
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: '#f3f4f6',
+    backgroundColor: colors.chipBg,
     alignItems: 'center',
     justifyContent: 'center',
   },
   reviewCardMeta: { flex: 1 },
-  reviewAuthor: { fontSize: 14, fontWeight: '600', color: '#111827' },
-  reviewDate: { fontSize: 12, color: '#9ca3af' },
+  reviewAuthor: { fontSize: 14, fontWeight: '600', color: colors.textPrimary },
+  reviewDate: { fontSize: 12, color: colors.textMuted },
   reviewStarsSmall: { flexDirection: 'row' },
-  starSmall: { fontSize: 14, color: '#d1d5db' },
-  starSmallActive: { color: '#ca8a04' },
-  reviewComment: { color: '#374151', fontSize: 14, lineHeight: 20 },
+  starSmall: { fontSize: 14, color: colors.borderStrong },
+  starSmallActive: { color: colors.rating },
+  reviewComment: { color: colors.textStrong, fontSize: 14, lineHeight: 20 },
 });
