@@ -5,6 +5,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from './lib/supabase';
 import AuthScreen from './screens/AuthScreen';
 import ChatScreen from './screens/ChatScreen';
+import FavoritesScreen from './screens/FavoritesScreen';
 import FeedScreen from './screens/FeedScreen';
 import PlaceDetailScreen from './screens/PlaceDetailScreen';
 import PlacesScreen from './screens/PlacesScreen';
@@ -39,6 +40,7 @@ function AppInner() {
   const [tab, setTab] = useState<Tab>('feed');
   const [selectedPlace, setSelectedPlace] = useState<SelectedPlace | null>(null);
   const [showReservations, setShowReservations] = useState(false);
+  const [showFavorites, setShowFavorites] = useState(false);
   const [session, setSession] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
@@ -191,14 +193,17 @@ function AppInner() {
           </View>
         )}
         {tab === 'chat' && <ChatScreen />}
-        {tab === 'profile' && !showReservations && (
+        {tab === 'profile' && !showReservations && !showFavorites && (
           <ProfileScreen
-            onOpenFavorites={() => setTab('places')}
+            onOpenFavorites={() => setShowFavorites(true)}
             onOpenReservations={() => setShowReservations(true)}
           />
         )}
         {tab === 'profile' && showReservations && (
           <ReservationHistoryScreen onBack={() => setShowReservations(false)} />
+        )}
+        {tab === 'profile' && showFavorites && !showReservations && (
+          <FavoritesScreen onBack={() => setShowFavorites(false)} />
         )}
       </View>
 
@@ -216,7 +221,10 @@ function AppInner() {
             style={[styles.tab, tab === item.id && styles.tabActive]}
             onPress={() => {
               setTab(item.id);
-              if (item.id !== 'profile') setShowReservations(false);
+              if (item.id !== 'profile') {
+                setShowReservations(false);
+                setShowFavorites(false);
+              }
             }}
           >
             <FontIcon

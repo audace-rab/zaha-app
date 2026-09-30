@@ -1,14 +1,18 @@
+import type { SupabaseClient } from '@supabase/supabase-js';
 import { createAdminClient } from '@/lib/supabase/server';
+import type { Database } from '@/lib/supabase/database.types';
+
+type Client = SupabaseClient<Database>;
 
 /**
  * Toggle follow. Retourne true si maintenant en train de suivre, false si désabonné.
+ * Le client passé doit être scopé à l'utilisateur (RLS appliqué).
  */
 export async function toggleFollow(
+  supabase: Client,
   followerId: string,
   followingId: string
 ): Promise<boolean> {
-  const supabase = createAdminClient();
-
   const { data: existing } = await supabase
     .from('follows')
     .select('id')
@@ -41,11 +45,41 @@ export async function toggleFollow(
   return true;
 }
 
-export async function isFollowing(
+/**
+ * Unfollow idempotent (DELETE) : ne recrée jamais le follow.
+ * Retourne true si un follow existait et a été supprimé.
+ */
+export async function unfollow(
+  supabase: Client,
   followerId: string,
   followingId: string
 ): Promise<boolean> {
-  const supabase = createAdminClient();
+  const { data: existing } = await supabase
+    .from('follows')
+    .select('id')
+    .eq('follower_id', followerId)
+    .eq('following_id', followingId)
+    .maybeSingle();
+
+  if (!existing) return false;
+
+  const { error } = await supabase
+    .from('follows')
+    .delete()
+    .eq('follower_id', followerId)
+    .eq('following_id', followingId);
+  if (error) {
+    console.error('Unfollow error:', error);
+    throw new Error('Failed to unfollow');
+  }
+  return true;
+}
+
+export async function isFollowing(
+  supabase: Client,
+  followerId: string,
+  followingId: string
+): Promise<boolean> {
   const { data } = await supabase
     .from('follows')
     .select('id')
@@ -56,6 +90,7 @@ export async function isFollowing(
 }
 
 export async function getFollowingIds(userId: string): Promise<Set<string>> {
+  // Lecture publique des follows (policy "viewable by everyone") — admin OK.
   const supabase = createAdminClient();
   const { data, error } = await supabase
     .from('follows')

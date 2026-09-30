@@ -21,6 +21,7 @@ type FeedItem = {
   content: string;
   likes: number;
   commentsList: any[];
+  commentsCount?: number;
   isBusiness: boolean;
   location: string;
   timestamp: string;
@@ -148,7 +149,6 @@ export type Reservation = {
 };
 
 export type CreateReservationData = {
-  userId: string;
   placeId: string;
   reservationType?: string;
   date: string;
@@ -161,14 +161,55 @@ export type CreateReservationData = {
 };
 
 import { config } from '../config';
+import { supabase } from './supabase';
 
 const API_URL = config.api.baseUrl;
+const NETWORK_ERROR_MESSAGE =
+  'Erreur réseau — vérifie ta connexion ou réessaie plus tard.';
+const REQUEST_TIMEOUT_MS = 15000;
+
+/** Récupère le JWT Supabase courant (null si non connecté). */
+async function getAccessToken(): Promise<string | null> {
+  try {
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+    return session?.access_token ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/** fetch avec timeout (AbortController) + message réseau uniforme. */
+async function fetchWithTimeout(
+  url: string,
+  options?: RequestInit
+): Promise<Response> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+  try {
+    return await fetch(url, { ...options, signal: controller.signal });
+  } catch (e: any) {
+    if (
+      e?.name === 'AbortError' ||
+      e?.name === 'TypeError' ||
+      e?.message?.includes('Network')
+    ) {
+      throw new Error(NETWORK_ERROR_MESSAGE);
+    }
+    throw e;
+  } finally {
+    clearTimeout(timer);
+  }
+}
 
 async function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {
-  const response = await fetch(`${API_URL}${path}`, {
+  const token = await getAccessToken();
+  const response = await fetchWithTimeout(`${API_URL}${path}`, {
     ...options,
     headers: {
       'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
       ...options?.headers,
     },
   });
@@ -185,64 +226,58 @@ export type { MapPlace, Profile, Review };
 
 // Upload en multipart : ne PAS forcer Content-Type JSON (boundary automatique).
 async function apiUpload<T>(path: string, formData: FormData): Promise<T> {
-  try {
-    const response = await fetch(`${API_URL}${path}`, {
-      method: 'POST',
-      body: formData,
-    });
+  const token = await getAccessToken();
+  const response = await fetchWithTimeout(`${API_URL}${path}`, {
+    method: 'POST',
+    body: formData,
+    headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+  });
 
-    if (!response.ok) {
-      const error = await response.json().catch(() => ({}));
-      throw new Error(error.error ?? `API error ${response.status}`);
-    }
-
-    return response.json();
-  } catch (e: any) {
-    if (e?.message?.includes('Network') || e?.name === 'TypeError') {
-      throw new Error('Erreur réseau — vérifie ta connexion ou réessaie plus tard.');
-    }
-    throw e;
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({}));
+    throw new Error(error.error ?? `API error ${response.status}`);
   }
+
+  return response.json();
 }
 
 export const api = {
   health: () => apiFetch<{ status: string }>('/api/health'),
 
-  getFeed: (location?: string, query?: string, userId?: string) => {
+  getFeed: (options?: { location?: string; query?: string; cursor?: string; limit?: number }) => {
     const params = new URLSearchParams();
-    if (location?.trim()) params.set('location', location.trim());
-    if (query?.trim()) params.set('query', query.trim());
-    if (userId?.trim()) params.set('userId', userId.trim());
+    if (options?.location?.trim()) params.set('location', options.location.trim());
+    if (options?.query?.trim()) params.set('query', options.query.trim());
+    if (options?.cursor) params.set('cursor', options.cursor);
+    if (options?.limit) params.set('limit', String(options.limit));
     const qs = params.toString();
-    return apiFetch<{ feed: FeedItem[] }>(`/api/feed${qs ? `?${qs}` : ''}`);
+    return apiFetch<{ feed: FeedItem[]; nextCursor: string | null }>(
+      `/api/feed${qs ? `?${qs}` : ''}`
+    );
   },
 
-  toggleLike: (postId: string, userId: string) =>
+  toggleLike: (postId: string) =>
     apiFetch<{ liked: boolean; likes: number }>(`/api/posts/${postId}/like`, {
       method: 'POST',
-      body: JSON.stringify({ userId }),
     }),
 
   getComments: (postId: string) =>
     apiFetch<{ comments: Comment[] }>(`/api/posts/${postId}/comments`),
 
-  addComment: (postId: string, authorId: string, text: string) =>
+  addComment: (postId: string, text: string) =>
     apiFetch<{ comment: Comment }>(`/api/posts/${postId}/comments`, {
       method: 'POST',
-      body: JSON.stringify({ authorId, text }),
+      body: JSON.stringify({ text }),
     }),
 
-  deleteComment: (postId: string, commentId: string, authorId: string) =>
+  deleteComment: (postId: string, commentId: string) =>
     apiFetch<{ success: boolean }>(`/api/posts/${postId}/comments/${commentId}`, {
       method: 'DELETE',
-      body: JSON.stringify({ authorId }),
     }),
 
-  deletePost: (id: string, userId: string) =>
+  deletePost: (id: string) =>
     apiFetch<{ deleted: boolean }>(`/api/posts/${id}`, {
       method: 'DELETE',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ userId }),
     }),
 
   searchPlaces: (body: PlacesSearchRequest) =>
@@ -251,10 +286,9 @@ export const api = {
       body: JSON.stringify(body),
     }),
 
-  fetchPlaces: (params?: { category?: string; userId?: string }) => {
+  fetchPlaces: (params?: { category?: string }) => {
     const search = new URLSearchParams();
     if (params?.category?.trim()) search.set('category', params.category.trim());
-    if (params?.userId?.trim()) search.set('userId', params.userId.trim());
     const qs = search.toString();
     return apiFetch<{ places: MapPlace[] }>(`/api/places${qs ? `?${qs}` : ''}`);
   },
@@ -280,19 +314,16 @@ export const api = {
       body: JSON.stringify({ messages, userLocation }),
     }),
 
-  toggleBookmark: (userId: string, placeId: string) =>
+  toggleBookmark: (placeId: string) =>
     apiFetch<BookmarkResponse>(`/api/places/${placeId}/bookmark`, {
       method: 'POST',
-      body: JSON.stringify({ userId }),
     }),
 
-  fetchBookmarkedPlaces: (userId: string) =>
-    apiFetch<{ places: Place[] }>(`/api/places/bookmarked?userId=${userId}`),
+  fetchBookmarkedPlaces: () =>
+    apiFetch<{ places: Place[] }>('/api/places/bookmarked'),
 
-  isBookmarked: (userId: string, placeId: string) =>
-    apiFetch<BookmarkResponse>(
-      `/api/places/${placeId}/bookmarked?userId=${encodeURIComponent(userId)}`
-    ),
+  isBookmarked: (placeId: string) =>
+    apiFetch<BookmarkResponse>(`/api/places/${placeId}/bookmarked`),
 
   fetchNearby: (lat: number, lng: number, radius = 5000) =>
     apiFetch<{ places: (Place & { distance_km?: number })[] }>(
@@ -302,38 +333,34 @@ export const api = {
   fetchProfile: (userId: string) =>
     apiFetch<{ profile: Profile }>(`/api/profile?userId=${encodeURIComponent(userId)}`),
 
-  updateProfile: (userId: string, data: ProfileUpdateData) =>
+  updateProfile: (data: ProfileUpdateData) =>
     apiFetch<{ profile: Profile }>('/api/profile', {
       method: 'PUT',
-      body: JSON.stringify({ userId, ...data }),
+      body: JSON.stringify(data),
     }),
 
-  uploadAvatar: (userId: string, base64Data: string) => {
+  uploadAvatar: (base64Data: string) => {
     return apiFetch<{ url: string }>('/api/profile/avatar', {
       method: 'POST',
-      body: JSON.stringify({ userId, file: base64Data }),
+      body: JSON.stringify({ file: base64Data }),
     });
   },
 
   fetchCategories: () =>
     apiFetch<{ categories: CategoryCount[] }>('/api/places/categories'),
 
-  followUser: (followerId: string, userId: string) =>
+  followUser: (userId: string) =>
     apiFetch<{ following: boolean }>(`/api/users/${userId}/follow`, {
       method: 'POST',
-      body: JSON.stringify({ followerId }),
     }),
 
-  unfollowUser: (followerId: string, userId: string) =>
+  unfollowUser: (userId: string) =>
     apiFetch<{ following: boolean }>(`/api/users/${userId}/follow`, {
       method: 'DELETE',
-      body: JSON.stringify({ followerId }),
     }),
 
-  isFollowing: (followerId: string, userId: string) =>
-    apiFetch<{ following: boolean }>(
-      `/api/users/${userId}/is-following?followerId=${encodeURIComponent(followerId)}`
-    ),
+  isFollowing: (userId: string) =>
+    apiFetch<{ following: boolean }>(`/api/users/${userId}/is-following`),
 
   fetchFollowers: (userId: string) =>
     apiFetch<{ users: Profile[] }>(`/api/users/${userId}/followers`),
@@ -341,13 +368,13 @@ export const api = {
   fetchFollowing: (userId: string) =>
     apiFetch<{ users: Profile[] }>(`/api/users/${userId}/following`),
 
-  createPost: (authorId: string, content: string, location?: string, media?: { url: string; type: string }[]) =>
+  createPost: (content: string, location?: string, media?: { url: string; type: string }[]) =>
     apiFetch<{ post: FeedItem }>('/api/posts', {
       method: 'POST',
-      body: JSON.stringify({ authorId, content, location, media }),
+      body: JSON.stringify({ content, location, media }),
     }),
 
-  uploadPostMedia: (userId: string, fileUri: string) => {
+  uploadPostMedia: (fileUri: string) => {
     const ext = fileUri.split('.').pop()?.toLowerCase() ?? '';
     const mimeMap: Record<string, string> = {
       mp4: 'video/mp4', mov: 'video/quicktime', avi: 'video/x-msvideo',
@@ -359,7 +386,6 @@ export const api = {
     const mime = mimeMap[ext] ?? (isVideo ? 'video/mp4' : 'image/jpeg');
     const fileName = isVideo ? `video.${ext || 'mp4'}` : `photo.${ext || 'jpg'}`;
     const formData = new FormData();
-    formData.append('userId', userId);
     formData.append('file', {
       uri: fileUri,
       name: fileName,
@@ -373,18 +399,16 @@ export const api = {
       `/api/places/${placeId}/reviews`,
     ),
 
-  submitReview: (placeId: string, userId: string, rating: number, comment?: string) =>
+  submitReview: (placeId: string, rating: number, comment?: string) =>
     apiFetch<{ review: Review }>(`/api/places/${placeId}/reviews`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ userId, rating, comment: comment?.trim() || undefined }),
+      body: JSON.stringify({ rating, comment: comment?.trim() || undefined }),
     }),
 
   createReservation: (data: CreateReservationData) =>
     apiFetch<{ reservation: Reservation }>('/api/reservations', {
       method: 'POST',
       body: JSON.stringify({
-        userId: data.userId,
         placeId: data.placeId,
         reservationType: data.reservationType ?? 'general',
         date: data.date,
@@ -397,20 +421,21 @@ export const api = {
       }),
     }),
 
-  getReservations: (userId: string, status?: string) => {
-    const params = new URLSearchParams({ userId });
+  getReservations: (status?: string) => {
+    const params = new URLSearchParams();
     if (status?.trim()) params.set('status', status.trim());
-    return apiFetch<{ reservations: Reservation[] }>(`/api/reservations?${params.toString()}`);
+    const qs = params.toString();
+    return apiFetch<{ reservations: Reservation[] }>(
+      `/api/reservations${qs ? `?${qs}` : ''}`
+    );
   },
 
   getReservation: (id: string) =>
     apiFetch<{ reservation: Reservation }>(`/api/reservations/${id}`),
 
-  cancelReservation: (id: string, userId: string) =>
+  cancelReservation: (id: string) =>
     apiFetch<{ reservation: Reservation }>(`/api/reservations/${id}`, {
       method: 'DELETE',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ userId }),
     }),
 
   updateReservation: (id: string, data: Partial<CreateReservationData>) =>

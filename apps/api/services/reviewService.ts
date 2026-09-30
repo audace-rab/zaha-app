@@ -1,4 +1,8 @@
+import type { SupabaseClient } from '@supabase/supabase-js';
 import { createAdminClient } from '@/lib/supabase/server';
+import type { Database } from '@/lib/supabase/database.types';
+
+type Client = SupabaseClient<Database>;
 
 export interface ReviewRow {
   id: string;
@@ -13,15 +17,15 @@ export interface ReviewRow {
 /**
  * Upsert d'un avis sur un lieu (upsert sur UNIQUE(user_id, place_id)).
  * Retourne null si le lieu n'existe pas.
+ * Le client passé doit être scopé à l'utilisateur (RLS appliqué).
  */
 export async function upsertPlaceReview(
+  supabase: Client,
   placeId: string,
   userId: string,
   rating: number,
   comment?: string
 ): Promise<ReviewRow | null> {
-  const supabase = createAdminClient();
-
   // Vérifier que le lieu existe
   const { data: place } = await supabase
     .from('places')

@@ -56,10 +56,16 @@ export interface FeedItem {
   content: string;
   likes: number;
   commentsList: Comment[];
+  commentsCount?: number;
   isBusiness: boolean;
   location: string;
   timestamp: string;
   hasLiked?: boolean;
+}
+
+export interface FeedPage {
+  items: FeedItem[];
+  nextCursor: string | null;
 }
 
 export interface UserProfile {

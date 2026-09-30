@@ -16,12 +16,10 @@ import {
 } from 'react-native';
 import MapView, { Marker } from 'react-native-maps';
 import { api } from '../lib/api';
-import { supabase } from '../lib/supabase';
+import { useAuthUser } from '../lib/useAuthUser';
 import ReservationScreen from './ReservationScreen';
 import FontIcon from '../components/FontIcon';
 import { colors, radius } from '../theme';
-
-const DEMO_USER_ID = 'a1000000-0000-0000-0000-000000000001';
 
 type Place = {
   id: string;
@@ -61,7 +59,7 @@ export default function PlaceDetailScreen({ place }: PlaceDetailScreenProps) {
   const [activePhotoIndex, setActivePhotoIndex] = useState(0);
   const [showMap, setShowMap] = useState(false);
   const [bookmarked, setBookmarked] = useState(false);
-  const [currentUserId, setCurrentUserId] = useState<string>(DEMO_USER_ID);
+  const currentUserId = useAuthUser();
   const [reviews, setReviews] = useState<Review[]>([]);
   const [averageRating, setAverageRating] = useState(0);
   const [reviewCount, setReviewCount] = useState(0);
@@ -103,14 +101,15 @@ export default function PlaceDetailScreen({ place }: PlaceDetailScreenProps) {
   }, [place?.id]);
 
   // Charger les reviews du lieu.
+  const placeId = place?.id;
   useEffect(() => {
-    if (!place) return;
+    if (!placeId) return;
     let cancelled = false;
     const load = async () => {
       setReviewsLoading(true);
       setReviewsError(null);
       try {
-        const result = await api.fetchReviews(place.id);
+        const result = await api.fetchReviews(placeId);
         if (cancelled) return;
         setReviews(result.reviews ?? []);
         setAverageRating(result.averageRating ?? 0);
@@ -128,30 +127,16 @@ export default function PlaceDetailScreen({ place }: PlaceDetailScreenProps) {
     };
     load();
     return () => { cancelled = true; };
-  }, [place?.id, currentUserId]);
-
-  useEffect(() => {
-    const resolveUserId = async () => {
-      try {
-        if (!supabase) return;
-        const { data } = await supabase.auth.getSession();
-        const id = data?.session?.user?.id;
-        if (id) setCurrentUserId(id);
-      } catch (e) {
-        console.warn('Session Supabase indisponible, utilisateur démo utilisé :', e);
-      }
-    };
-    resolveUserId();
-  }, []);
+  }, [placeId, currentUserId]);
 
   // Charger le statut bookmark initial quand le lieu ou l'utilisateur change.
   useEffect(() => {
-    if (!place || !currentUserId) return;
+    if (!placeId || !currentUserId) return;
     let cancelled = false;
     api
-      .isBookmarked(currentUserId, place.id)
-      .then(({ bookmarked }) => {
-        if (!cancelled) setBookmarked(bookmarked);
+      .isBookmarked(placeId)
+      .then(({ bookmarked: value }) => {
+        if (!cancelled) setBookmarked(value);
       })
       .catch(() => {
         // Statut inconnu : garder false par défaut
@@ -159,14 +144,14 @@ export default function PlaceDetailScreen({ place }: PlaceDetailScreenProps) {
     return () => {
       cancelled = true;
     };
-  }, [place?.id, currentUserId]);
+  }, [placeId, currentUserId]);
 
   const handleSubmitReview = async () => {
     if (!place || formRating < 1 || formRating > 5) return;
     setFormSubmitting(true);
     setFormError(null);
     try {
-      await api.submitReview(place.id, currentUserId, formRating, formComment || undefined);
+      await api.submitReview(place.id, formRating, formComment || undefined);
       // Recharger les avis.
       const result = await api.fetchReviews(place.id);
       setReviews(result.reviews ?? []);
@@ -182,6 +167,14 @@ export default function PlaceDetailScreen({ place }: PlaceDetailScreenProps) {
 
   const myReview = reviews.find((r) => r.user_id === currentUserId);
 
+  // Feedback réservation (auto-effacé). Déclaré AVANT le early return
+  // ci-dessous pour respecter l'ordre des hooks.
+  useEffect(() => {
+    if (!reservationSuccess) return;
+    const timer = setTimeout(() => setReservationSuccess(false), 4000);
+    return () => clearTimeout(timer);
+  }, [reservationSuccess]);
+
   if (!place) {
     return (
       <View style={styles.center}>
@@ -189,13 +182,6 @@ export default function PlaceDetailScreen({ place }: PlaceDetailScreenProps) {
       </View>
     );
   }
-
-  // Feedback réservation (auto-effacé).
-  useEffect(() => {
-    if (!reservationSuccess) return;
-    const timer = setTimeout(() => setReservationSuccess(false), 4000);
-    return () => clearTimeout(timer);
-  }, [reservationSuccess]);
 
   const openPhone = async () => {
     if (!place.phoneNumber) return;
@@ -247,7 +233,7 @@ export default function PlaceDetailScreen({ place }: PlaceDetailScreenProps) {
     const previous = bookmarked;
     setBookmarked(!previous);
     api
-      .toggleBookmark(currentUserId, place.id)
+      .toggleBookmark(place.id)
       .then(({ bookmarked: serverValue }) => setBookmarked(serverValue))
       .catch((e: Error) => {
         console.warn('Erreur bookmark :', e.message);

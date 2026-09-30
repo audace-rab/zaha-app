@@ -1,23 +1,22 @@
+import { requireUser } from '@/lib/api/auth';
 import { errorResponse, jsonResponse, optionsResponse } from '@/lib/api/response';
 import { createAdminClient } from '@/lib/supabase/server';
 import { getBookmarkedPlaceIds } from '@/services/bookmarkService';
-import { isValidUuid } from '@/services/postService';
 import { getReviewStatsMap } from '@/services/reviewService';
 
 export async function GET(request: Request) {
   try {
-    const url = new URL(request.url);
-    const userId = url.searchParams.get('userId')?.trim();
-
-    if (!userId || !isValidUuid(userId)) {
-      return errorResponse('userId is required and must be a valid UUID', 400);
+    const auth = await requireUser(request);
+    if (!auth) {
+      return errorResponse('Authentication required', 401);
     }
 
-    const bookmarkedIds = await getBookmarkedPlaceIds(userId);
+    const bookmarkedIds = await getBookmarkedPlaceIds(auth.userId);
     if (bookmarkedIds.size === 0) {
       return jsonResponse({ places: [] });
     }
 
+    // Les lieux sont publics — lecture admin, liste d'IDs déjà scopée au user JWT
     const supabase = createAdminClient();
     const { data, error } = await supabase
       .from('places')

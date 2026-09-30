@@ -1,7 +1,7 @@
+import { requireUser } from '@/lib/api/auth';
 import { errorResponse, jsonResponse, optionsResponse } from '@/lib/api/response';
 import { isValidUuid } from '@/services/postService';
 import { cancelReservation, getReservationById, updateReservation } from '@/services/reservationService';
-import { createServerClient } from '@/lib/supabase/server';
 
 export async function GET(
   request: Request,
@@ -13,22 +13,14 @@ export async function GET(
       return errorResponse('Reservation not found', 404);
     }
 
-    let userId: string | undefined;
-    const authHeader = request.headers.get('authorization');
-    if (authHeader?.toLowerCase().startsWith('bearer ')) {
-      try {
-        const supabase = createServerClient(authHeader.slice(7).trim());
-        const { data } = await supabase.auth.getUser();
-        if (data?.user?.id) userId = data.user.id;
-      } catch {}
+    const auth = await requireUser(request);
+    if (!auth) {
+      return errorResponse('Authentication required', 401);
     }
 
-    const reservation = await getReservationById(reservationId);
+    // RLS : un non-propriétaire obtient null → 404 (pas de fuite)
+    const reservation = await getReservationById(auth.supabase, reservationId);
     if (!reservation) {
-      return errorResponse('Reservation not found', 404);
-    }
-
-    if (userId && reservation.user_id !== userId) {
       return errorResponse('Reservation not found', 404);
     }
 
@@ -49,54 +41,39 @@ export async function PUT(
       return errorResponse('Reservation not found', 404);
     }
 
-    let userId: string | undefined;
-    const authHeader = request.headers.get('authorization');
-    if (authHeader?.toLowerCase().startsWith('bearer ')) {
-      try {
-        const supabase = createServerClient(authHeader.slice(7).trim());
-        const { data } = await supabase.auth.getUser();
-        if (data?.user?.id) userId = data.user.id;
-      } catch {}
-    }
-    if (!userId) {
-      const body = (await request.json()) as { userId?: string };
-      if (body.userId?.trim()) userId = body.userId.trim();
+    const auth = await requireUser(request);
+    if (!auth) {
+      return errorResponse('Authentication required', 401);
     }
 
-    if (!userId || !isValidUuid(userId)) {
-      return errorResponse('userId is required', 400);
-    }
-
-    const existing = await getReservationById(reservationId);
-    if (!existing) {
-      return errorResponse('Reservation not found', 404);
-    }
-    if (existing.user_id !== userId) {
-      return errorResponse('Reservation not found', 404);
-    }
-
+    // Body lu une seule fois
     const body = (await request.json()) as {
       status?: string;
       paymentMethod?: string;
-      paymentStatus?: string;
       note?: string;
       guests?: number;
       timeStart?: string;
       timeEnd?: string;
     };
 
-    if (body.status && !['pending', 'confirmed', 'cancelled', 'completed'].includes(body.status)) {
-      return errorResponse('status must be one of: pending, confirmed, cancelled, completed', 400);
+    // Le client ne peut que remettre en attente ou annuler —
+    // confirmed/completed sont réservés à un futur back-office.
+    if (body.status && !['pending', 'cancelled'].includes(body.status)) {
+      return errorResponse('status must be one of: pending, cancelled', 400);
     }
 
-    if (body.paymentStatus && !['unpaid', 'paid', 'refunded'].includes(body.paymentStatus)) {
-      return errorResponse('paymentStatus must be one of: unpaid, paid, refunded', 400);
+    const existing = await getReservationById(auth.supabase, reservationId);
+    if (!existing) {
+      return errorResponse('Reservation not found', 404);
+    }
+    if (existing.user_id !== auth.userId) {
+      return errorResponse('Reservation not found', 404);
     }
 
-    const updated = await updateReservation(reservationId, {
+    // paymentStatus / price ne sont jamais acceptés du client
+    const updated = await updateReservation(auth.supabase, reservationId, {
       status: body.status,
       paymentMethod: body.paymentMethod,
-      paymentStatus: body.paymentStatus,
       note: body.note,
       guests: body.guests,
       timeStart: body.timeStart,
@@ -124,26 +101,12 @@ export async function DELETE(
       return errorResponse('Reservation not found', 404);
     }
 
-    let userId: string | undefined;
-    const authHeader = request.headers.get('authorization');
-    if (authHeader?.toLowerCase().startsWith('bearer ')) {
-      try {
-        const supabase = createServerClient(authHeader.slice(7).trim());
-        const { data } = await supabase.auth.getUser();
-        if (data?.user?.id) userId = data.user.id;
-      } catch {}
+    const auth = await requireUser(request);
+    if (!auth) {
+      return errorResponse('Authentication required', 401);
     }
 
-    if (!userId) {
-      const body = await request.json().catch(() => ({})) as { userId?: string };
-      if (body.userId?.trim()) userId = body.userId.trim();
-    }
-
-    if (!userId || !isValidUuid(userId)) {
-      return errorResponse('userId is required', 400);
-    }
-
-    const cancelled = await cancelReservation(reservationId, userId);
+    const cancelled = await cancelReservation(auth.supabase, reservationId, auth.userId);
     if (!cancelled) {
       return errorResponse('Reservation not found or already cancelled', 404);
     }

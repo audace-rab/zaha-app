@@ -11,13 +11,11 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { supabase } from '../lib/supabase';
 import { api, type Reservation } from '../lib/api';
+import { useAuthUser } from '../lib/useAuthUser';
 import { formatDateDisplay } from '../lib/format';
 import FontIcon from '../components/FontIcon';
 import { colors, radius } from '../theme';
-
-const DEMO_USER_ID = 'a1000000-0000-0000-0000-000000000001';
 
 type StatusFilter = 'all' | Reservation['status'];
 
@@ -46,22 +44,8 @@ export default function ReservationHistoryScreen({ onBack }: ReservationHistoryS
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState<StatusFilter>('all');
-  const [currentUserId, setCurrentUserId] = useState<string>(DEMO_USER_ID);
+  const currentUserId = useAuthUser();
   const [cancellingId, setCancellingId] = useState<string | null>(null);
-
-  useEffect(() => {
-    const resolve = async () => {
-      try {
-        if (!supabase) return;
-        const { data } = await supabase.auth.getSession();
-        const id = data?.session?.user?.id;
-        if (id) setCurrentUserId(id);
-      } catch (e) {
-        console.warn('Session indisponible, utilisateur démo utilisé');
-      }
-    };
-    resolve();
-  }, []);
 
   // Intercepter le bouton retour Android pour revenir à Profil
   useEffect(() => {
@@ -75,11 +59,16 @@ export default function ReservationHistoryScreen({ onBack }: ReservationHistoryS
 
   const load = useCallback(
     (statusOverride?: StatusFilter) => {
+      // Tant que la session n'est pas résolue, ne rien demander (401 sinon).
+      if (!currentUserId) {
+        setLoading(false);
+        return Promise.resolve();
+      }
       const statusParam = statusOverride === 'all' ? undefined : (statusOverride ?? (filter === 'all' ? undefined : filter));
       setLoading(true);
       setError(null);
       return api
-        .getReservations(currentUserId, statusParam)
+        .getReservations(statusParam)
         .then(({ reservations: items }) => setReservations(items))
         .catch((e: Error) => setError(e.message))
         .finally(() => setLoading(false));
@@ -116,7 +105,7 @@ export default function ReservationHistoryScreen({ onBack }: ReservationHistoryS
     setCancellingId(id);
     setError(null);
     try {
-      await api.cancelReservation(id, currentUserId);
+      await api.cancelReservation(id);
       setReservations((prev) =>
         prev.map((r) => (r.id === id ? { ...r, status: 'cancelled' as const } : r))
       );

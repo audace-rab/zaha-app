@@ -1,3 +1,4 @@
+import { requireUser } from '@/lib/api/auth';
 import { errorResponse, jsonResponse, optionsResponse } from '@/lib/api/response';
 import { isFollowing } from '@/services/followService';
 import { isValidUuid } from '@/services/postService';
@@ -9,23 +10,23 @@ export async function GET(
   try {
     const { id: followingId } = await params;
     if (!isValidUuid(followingId)) {
-      return errorResponse('User not found', 404);
+      return errorResponse('User not found', 404, request);
     }
 
-    const url = new URL(request.url);
-    const followerId = url.searchParams.get('followerId')?.trim();
-    if (!followerId || !isValidUuid(followerId)) {
-      return errorResponse('followerId is required and must be a valid UUID', 400);
+    // Le follower est toujours l'utilisateur authentifié (JWT)
+    const auth = await requireUser(request);
+    if (!auth) {
+      return errorResponse('Authentication required', 401, request);
     }
 
-    const following = await isFollowing(followerId, followingId);
-    return jsonResponse({ following });
+    const following = await isFollowing(auth.supabase, auth.userId, followingId);
+    return jsonResponse({ following }, 200, request);
   } catch (error) {
     console.error('GET /api/users/[id]/is-following', error);
-    return errorResponse('Failed to check follow status');
+    return errorResponse('Failed to check follow status', 500, request);
   }
 }
 
-export async function OPTIONS() {
-  return optionsResponse();
+export async function OPTIONS(request: Request) {
+  return optionsResponse(request);
 }

@@ -1,5 +1,5 @@
+import { requireUser } from '@/lib/api/auth';
 import { errorResponse, jsonResponse, optionsResponse } from '@/lib/api/response';
-import { createServerClient } from '@/lib/supabase/server';
 import { isValidUuid } from '@/services/postService';
 import { listPlaceReviews, upsertPlaceReview } from '@/services/reviewService';
 
@@ -31,33 +31,20 @@ export async function POST(
     }
 
     const body = (await request.json()) as {
-      userId?: string;
       rating?: number;
       comment?: string;
     };
 
-    let userId: string | undefined;
-    const authHeader = request.headers.get('authorization');
-    if (authHeader?.toLowerCase().startsWith('bearer ')) {
-      try {
-        const supabase = createServerClient(authHeader.slice(7).trim());
-        const { data } = await supabase.auth.getUser();
-        if (data?.user?.id) userId = data.user.id;
-      } catch {}
-    }
-    if (!userId && body.userId?.trim()) {
-      userId = body.userId.trim();
-    }
-
-    if (!userId || !isValidUuid(userId)) {
-      return errorResponse('userId is required and must be a valid UUID', 400);
+    const auth = await requireUser(request);
+    if (!auth) {
+      return errorResponse('Authentication required', 401);
     }
 
     if (!body.rating || body.rating < 1 || body.rating > 5) {
       return errorResponse('rating is required and must be between 1 and 5', 400);
     }
 
-    const review = await upsertPlaceReview(placeId, userId, body.rating, body.comment);
+    const review = await upsertPlaceReview(auth.supabase, placeId, auth.userId, body.rating, body.comment);
 
     if (!review) {
       return errorResponse('Place not found', 404);

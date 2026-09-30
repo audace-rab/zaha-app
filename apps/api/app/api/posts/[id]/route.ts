@@ -1,5 +1,5 @@
+import { requireUser } from '@/lib/api/auth';
 import { errorResponse, jsonResponse, optionsResponse } from '@/lib/api/response';
-import { createAdminClient } from '@/lib/supabase/server';
 import { isValidUuid } from '@/services/postService';
 
 export async function DELETE(
@@ -13,13 +13,12 @@ export async function DELETE(
       return errorResponse('Post not found', 404);
     }
 
-    const body = await request.json().catch(() => ({})) as { userId?: string };
-
-    if (!body.userId || !isValidUuid(body.userId)) {
-      return errorResponse('userId is required and must be a valid UUID', 400);
+    const auth = await requireUser(request);
+    if (!auth) {
+      return errorResponse('Authentication required', 401);
     }
 
-    const supabase = createAdminClient();
+    const supabase = auth.supabase;
 
     const { data: post } = await supabase
       .from('posts')
@@ -31,10 +30,11 @@ export async function DELETE(
       return errorResponse('Post not found', 404);
     }
 
-    if (post.author_id !== body.userId) {
+    if (post.author_id !== auth.userId) {
       return errorResponse('Post not found', 404);
     }
 
+    // RLS : seul l'auteur peut supprimer (policy "Authors can delete own posts")
     const { error } = await supabase
       .from('posts')
       .delete()

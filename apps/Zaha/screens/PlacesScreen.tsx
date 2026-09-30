@@ -15,6 +15,7 @@ import {
 } from 'react-native';
 import Geolocation from '@react-native-community/geolocation';
 import { api } from '../lib/api';
+import { readCache, writeCache } from '../lib/cache';
 import FontIcon, { type FontIconName } from '../components/FontIcon';
 import { colors, radius } from '../theme';
 
@@ -102,13 +103,25 @@ export default function PlacesScreen({ onSelectPlace }: PlacesScreenProps) {
 
   // Chargement automatique : tous les lieux de la catégorie courante,
   // sans filtre. Rechargé uniquement au montage et au changement de catégorie.
+  // Stale-while-revalidate : le cache AsyncStorage est affiché immédiatement,
+  // puis rafraîchi par le réseau.
   useEffect(() => {
     let cancelled = false;
+    const cacheKey = `cache:places:v1:${category || 'all'}`;
     const load = async () => {
       setNearbyActive(false);
       setUserCoords(null);
       setNearbyError(null);
-      setLoading(true);
+      const cached = await readCache<{ places: Place[]; summary: string }>(cacheKey);
+      const hasCache = Boolean(cached && cached.places.length > 0);
+      if (hasCache && !cancelled) {
+        setPlaces(cached!.places);
+        setSummary(cached!.summary);
+        setFiltersOpen(false);
+        setLoading(false);
+      } else {
+        setLoading(true);
+      }
       try {
         const result = await api.searchPlaces({
           category: category || 'all',
@@ -119,12 +132,16 @@ export default function PlacesScreen({ onSelectPlace }: PlacesScreenProps) {
         setSummary(result.summary);
         // Résultats → filtres repliés ; vide/erreur → formulaire déroulé.
         setFiltersOpen(filtered.length === 0);
+        writeCache(cacheKey, { places: filtered, summary: result.summary });
       } catch (e) {
         if (cancelled) return;
         console.warn('Erreur chargement des lieux :', e);
-        setSummary('Impossible de charger les lieux. Vérifiez votre connexion puis réessayez.');
-        setPlaces([]);
-        setFiltersOpen(true);
+        // Garder le cache affiché si disponible ; sinon montrer l'erreur.
+        if (!hasCache) {
+          setSummary('Impossible de charger les lieux. Vérifiez votre connexion puis réessayez.');
+          setPlaces([]);
+          setFiltersOpen(true);
+        }
       } finally {
         if (!cancelled) setLoading(false);
       }

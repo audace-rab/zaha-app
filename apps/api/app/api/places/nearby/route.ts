@@ -25,13 +25,13 @@ export async function GET(request: Request) {
 
     const places = await listNearbyPlaces(lat, lng, radius);
 
-    return jsonResponse({ places });
+    return jsonResponse({ places }, 200, request);
   } catch (error) {
     console.error('GET /api/places/nearby', error);
-    return errorResponse('Failed to fetch nearby places');
+    return errorResponse('Failed to fetch nearby places', 500, request);
   }
 }
 
-export async function OPTIONS() {
-  return optionsResponse();
+export async function OPTIONS(request: Request) {
+  return optionsResponse(request);
 }

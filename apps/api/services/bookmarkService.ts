@@ -1,15 +1,19 @@
+import type { SupabaseClient } from '@supabase/supabase-js';
 import { createAdminClient } from '@/lib/supabase/server';
+import type { Database } from '@/lib/supabase/database.types';
+
+type Client = SupabaseClient<Database>;
 
 /**
  * Toggle bookmark d'un lieu pour un utilisateur.
  * Retourne null si le lieu n'existe pas.
+ * Le client passé doit être scopé à l'utilisateur (RLS appliqué).
  */
 export async function toggleBookmark(
+  supabase: Client,
   placeId: string,
   userId: string
 ): Promise<boolean | null> {
-  const supabase = createAdminClient();
-
   const { data: place, error: placeError } = await supabase
     .from('places')
     .select('id')
@@ -56,10 +60,10 @@ export async function toggleBookmark(
 }
 
 export async function isBookmarked(
+  supabase: Client,
   placeId: string,
   userId: string
 ): Promise<boolean> {
-  const supabase = createAdminClient();
   const { data, error } = await supabase
     .from('bookmarks')
     .select('id')
@@ -75,6 +79,8 @@ export async function isBookmarked(
 }
 
 export async function getBookmarkedPlaceIds(userId: string): Promise<Set<string>> {
+  // Lecture des bookmarks : admin car la liste est ensuite jointe aux lieux
+  // publics. L'userId vient toujours du JWT vérifié dans la route.
   const supabase = createAdminClient();
   const { data, error } = await supabase
     .from('bookmarks')

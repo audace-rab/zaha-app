@@ -10,13 +10,11 @@ import {
   View,
 } from 'react-native';
 import DateTimePicker, { type DateTimePickerEvent } from '@react-native-community/datetimepicker';
-import { supabase } from '../lib/supabase';
 import { api } from '../lib/api';
+import { useAuthUser } from '../lib/useAuthUser';
 import { formatDateDisplay } from '../lib/format';
 import FontIcon, { type FontIconName } from '../components/FontIcon';
 import { colors, radius } from '../theme';
-
-const DEMO_USER_ID = 'a1000000-0000-0000-0000-000000000001';
 
 type PlaceMini = {
   id: string;
@@ -59,7 +57,7 @@ const formatTime = (d: Date) =>
 const today = new Date();
 
 export default function ReservationScreen({ place, onDone }: ReservationScreenProps) {
-  const [currentUserId, setCurrentUserId] = useState<string>(DEMO_USER_ID);
+  const currentUserId = useAuthUser();
   const reservationType = deriveType(place.category);
 
   const [dateObj, setDateObj] = useState<Date>(today);
@@ -82,20 +80,6 @@ export default function ReservationScreen({ place, onDone }: ReservationScreenPr
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  useState(() => {
-    const resolve = async () => {
-      try {
-        if (!supabase) return;
-        const { data } = await supabase.auth.getSession();
-        const id = data?.session?.user?.id;
-        if (id) setCurrentUserId(id);
-      } catch (e) {
-        console.warn('Session indisponible, utilisateur démo utilisé');
-      }
-    };
-    resolve();
-  });
-
   const onDateChange = (_event: DateTimePickerEvent, selected?: Date) => {
     setShowDatePicker(Platform.OS === 'ios');
     if (selected) setDateObj(selected);
@@ -113,11 +97,14 @@ export default function ReservationScreen({ place, onDone }: ReservationScreenPr
 
   const handleSubmit = async () => {
     if (!formValid) return;
+    if (!currentUserId) {
+      setError('Tu dois être connecté pour réserver.');
+      return;
+    }
     setLoading(true);
     setError(null);
     try {
       await api.createReservation({
-        userId: currentUserId,
         placeId: place.id,
         reservationType,
         date: formatDateISO(dateObj),

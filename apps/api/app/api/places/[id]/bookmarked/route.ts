@@ -1,5 +1,5 @@
+import { requireUser } from '@/lib/api/auth';
 import { errorResponse, jsonResponse, optionsResponse } from '@/lib/api/response';
-import { createServerClient } from '@/lib/supabase/server';
 import { isBookmarked } from '@/services/bookmarkService';
 import { isValidUuid } from '@/services/postService';
 
@@ -14,30 +14,12 @@ export async function GET(
       return errorResponse('Place not found', 404);
     }
 
-    // Session Supabase prioritaire, sinon ?userId=
-    let userId: string | undefined;
-    const authHeader = request.headers.get('authorization');
-    if (authHeader?.toLowerCase().startsWith('bearer ')) {
-      try {
-        const supabase = createServerClient(authHeader.slice(7).trim());
-        const { data } = await supabase.auth.getUser();
-        if (data?.user?.id) userId = data.user.id;
-      } catch {
-        // token invalide : retomber sur query param
-      }
+    const auth = await requireUser(request);
+    if (!auth) {
+      return errorResponse('Authentication required', 401);
     }
 
-    const url = new URL(request.url);
-    const userIdParam = url.searchParams.get('userId')?.trim();
-    if (!userId && userIdParam) {
-      userId = userIdParam;
-    }
-
-    if (!userId || !isValidUuid(userId)) {
-      return errorResponse('userId is required and must be a valid UUID', 400);
-    }
-
-    const bookmarked = await isBookmarked(placeId, userId);
+    const bookmarked = await isBookmarked(auth.supabase, placeId, auth.userId);
 
     return jsonResponse({ bookmarked });
   } catch (error) {

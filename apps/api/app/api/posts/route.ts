@@ -1,6 +1,5 @@
+import { requireUser } from '@/lib/api/auth';
 import { errorResponse, jsonResponse, optionsResponse } from '@/lib/api/response';
-import { createAdminClient } from '@/lib/supabase/server';
-import { isValidUuid } from '@/services/postService';
 
 interface MediaItem {
   url: string;
@@ -9,28 +8,29 @@ interface MediaItem {
 
 export async function POST(request: Request) {
   try {
+    const auth = await requireUser(request);
+    if (!auth) {
+      return errorResponse('Authentication required', 401);
+    }
+
     const body = (await request.json()) as {
-      authorId?: string;
       content?: string;
       location?: string;
       media?: MediaItem[];
     };
 
-    if (!body.authorId?.trim() || !isValidUuid(body.authorId.trim())) {
-      return errorResponse('authorId is required and must be a valid UUID', 400);
-    }
-    if (!body.content?.trim()) {
-      return errorResponse('content is required', 400);
+    if (!body.content?.trim() && !body.media?.length) {
+      return errorResponse('content or media is required', 400);
     }
 
-    const supabase = createAdminClient();
+    const supabase = auth.supabase;
 
-    // Créer le post
+    // Créer le post (RLS : author_id = auth.uid())
     const { data: post, error: postError } = await supabase
       .from('posts')
       .insert({
-        author_id: body.authorId.trim(),
-        content: body.content.trim(),
+        author_id: auth.userId,
+        content: body.content?.trim() ?? '',
         location: body.location?.trim() ?? '',
       })
       .select('id')

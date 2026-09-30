@@ -17,11 +17,12 @@ import {
 } from 'react-native';
 import { launchImageLibrary } from 'react-native-image-picker';
 import { api, type Comment } from '../lib/api';
-import { supabase } from '../lib/supabase';
+import { readCache, writeCache } from '../lib/cache';
+import { useAuthUser } from '../lib/useAuthUser';
 import FontIcon from '../components/FontIcon';
 import { colors, radius } from '../theme';
 
-const DEMO_USER_ID = 'a1000000-0000-0000-0000-000000000001';
+const FEED_CACHE_KEY = 'cache:feed:v1';
 const SCREEN_WIDTH = Dimensions.get('window').width;
 const CARD_WIDTH = SCREEN_WIDTH - 32;
 
@@ -49,6 +50,7 @@ type FeedItem = {
   content: string;
   likes: number;
   commentsList: any[];
+  commentsCount?: number;
   isBusiness: boolean;
   location: string;
   timestamp: string;
@@ -66,8 +68,10 @@ export default function FeedScreen({ query, onClearSearch }: FeedScreenProps) {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [currentUserId, setCurrentUserId] = useState<string>(DEMO_USER_ID);
+  const currentUserId = useAuthUser();
   const [postError, setPostError] = useState<string | null>(null);
+  const [nextCursor, setNextCursor] = useState<string | null>(null);
+  const [loadingMore, setLoadingMore] = useState(false);
 
 
   // Create post
@@ -76,20 +80,6 @@ export default function FeedScreen({ query, onClearSearch }: FeedScreenProps) {
   const [postPhotos, setPostPhotos] = useState<{ uri: string; type: 'image' | 'video' }[]>([]);
   const [creatingPost, setCreatingPost] = useState(false);
   const [keyboardHeight, setKeyboardHeight] = useState(0);
-
-  useEffect(() => {
-    const resolveUserId = async () => {
-      try {
-        if (!supabase) return;
-        const { data } = await supabase.auth.getSession();
-        const id = data?.session?.user?.id;
-        if (id) setCurrentUserId(id);
-      } catch (e) {
-        console.warn('Session Supabase indisponible, utilisateur démo utilisé :', e);
-      }
-    };
-    resolveUserId();
-  }, []);
 
   useEffect(() => {
     const showSub = Keyboard.addListener('keyboardDidShow', (e) => {
@@ -101,27 +91,67 @@ export default function FeedScreen({ query, onClearSearch }: FeedScreenProps) {
     return () => { showSub.remove(); hideSub.remove(); };
   }, []);
 
+  // Première page (stale-while-revalidate : le cache est affiché au montage,
+  // puis ce fetch rafraîchit).
   const load = useCallback(
     (q?: string) => {
-      setLoading(true);
       setError(null);
       setPostError(null);
-      return api.getFeed(undefined, q, currentUserId)
-        .then(({ feed: items }) => setFeed(items))
+      return api.getFeed({ query: q })
+        .then(({ feed: items, nextCursor: cursor }) => {
+          setFeed(items);
+          setNextCursor(cursor);
+          if (!q?.trim()) {
+            writeCache(FEED_CACHE_KEY, { items, nextCursor: cursor });
+          }
+        })
         .catch((e: Error) => setError(e.message))
-        .finally(() => setLoading(false));
+        .finally(() => {
+          setLoading(false);
+          setRefreshing(false);
+        });
     },
-    [currentUserId]
+    []
   );
 
+  // Page suivante (pagination keyset)
+  const loadMore = useCallback(() => {
+    if (!nextCursor || loadingMore || loading || query?.trim()) return;
+    setLoadingMore(true);
+    api.getFeed({ cursor: nextCursor })
+      .then(({ feed: items, nextCursor: cursor }) => {
+        setFeed((prev) => {
+          const seen = new Set(prev.map((p) => p.id));
+          return [...prev, ...items.filter((i) => !seen.has(i.id))];
+        });
+        setNextCursor(cursor);
+      })
+      .catch(() => {
+        // Silencieux : l'utilisateur peut réessayer en scrollant à nouveau.
+      })
+      .finally(() => setLoadingMore(false));
+  }, [nextCursor, loadingMore, loading, query]);
+
   useEffect(() => {
-    load(query);
+    let cancelled = false;
+    const bootstrap = async () => {
+      if (!query?.trim()) {
+        const cached = await readCache<{ items: FeedItem[]; nextCursor: string | null }>(FEED_CACHE_KEY);
+        if (cached && !cancelled && cached.items.length > 0) {
+          setFeed(cached.items);
+          setNextCursor(cached.nextCursor);
+          setLoading(false);
+        }
+      }
+      load(query);
+    };
+    bootstrap();
+    return () => { cancelled = true; };
   }, [query, load]);
 
-  const onRefresh = async () => {
+  const onRefresh = () => {
     setRefreshing(true);
-    await load(query);
-    setRefreshing(false);
+    load(query);
   };
 
   // Like
@@ -134,7 +164,7 @@ export default function FeedScreen({ query, onClearSearch }: FeedScreenProps) {
       );
     setFeed(applyToggle);
     api
-      .toggleLike(postId, currentUserId)
+      .toggleLike(postId)
       .then(({ liked, likes }) => {
         setFeed((prev) =>
           prev.map((item) => (item.id === postId ? { ...item, hasLiked: liked, likes } : item))
@@ -155,8 +185,8 @@ export default function FeedScreen({ query, onClearSearch }: FeedScreenProps) {
     setFeed(applyToggle);
     const current = feed.find((i) => i.authorId === userId)?.isFollowing;
     const request = current
-      ? api.unfollowUser(currentUserId, userId)
-      : api.followUser(currentUserId, userId);
+      ? api.unfollowUser(userId)
+      : api.followUser(userId);
     request
       .then(({ following }) => {
         setFeed((prev) =>
@@ -191,7 +221,7 @@ export default function FeedScreen({ query, onClearSearch }: FeedScreenProps) {
     const previous = feed;
     setFeed((prev) => prev.filter((p) => p.id !== item.id));
     api
-      .deletePost(item.id, currentUserId)
+      .deletePost(item.id)
       .catch((e: Error) => {
         console.warn('Erreur suppression post :', e.message);
         setFeed(previous);
@@ -227,22 +257,26 @@ export default function FeedScreen({ query, onClearSearch }: FeedScreenProps) {
     try {
       const media: { url: string; type: string }[] = [];
       for (const item of postPhotos) {
-        const { url } = await api.uploadPostMedia(currentUserId, item.uri);
+        const { url } = await api.uploadPostMedia(item.uri);
         media.push({ url, type: item.type });
       }
-      await api.createPost(currentUserId, postContent.trim(), undefined, media.length > 0 ? media : undefined);
+      await api.createPost(postContent.trim(), undefined, media.length > 0 ? media : undefined);
       setPostContent('');
       setPostPhotos([]);
       setCreateVisible(false);
       await load(query);
-    } catch (e) {
-      console.warn('Erreur création post :', e);
+    } catch (e: any) {
+      // Erreur visible + brouillon conservé (les champs ne sont pas vidés)
+      Alert.alert(
+        'Publication impossible',
+        e?.message ?? 'Une erreur est survenue. Réessaie plus tard.'
+      );
     } finally {
       setCreatingPost(false);
     }
   };
 
-  if (error) {
+  if (error && feed.length === 0) {
     return (
       <View style={styles.center}>
         <Text style={styles.emptyTitle}>Impossible de charger le fil d’actualité</Text>
@@ -265,6 +299,13 @@ export default function FeedScreen({ query, onClearSearch }: FeedScreenProps) {
         data={feed}
         keyExtractor={(item) => item.id}
         contentContainerStyle={styles.list}
+        onEndReached={loadMore}
+        onEndReachedThreshold={0.4}
+        ListFooterComponent={
+          loadingMore ? (
+            <ActivityIndicator style={styles.footerSpinner} color={colors.primary} />
+          ) : undefined
+        }
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[colors.primary]} tintColor="#2563eb" />
         }
@@ -308,7 +349,6 @@ export default function FeedScreen({ query, onClearSearch }: FeedScreenProps) {
             onToggleLike={handleToggleLike}
             onToggleFollow={handleToggleFollow}
             onDeletePost={handleDeletePost}
-            onRefreshFeed={() => load(query)}
           />
         )}
       />
@@ -388,20 +428,21 @@ function PostCard({
   onToggleLike,
   onToggleFollow,
   onDeletePost,
-  onRefreshFeed,
 }: {
   item: FeedItem;
-  currentUserId: string;
+  currentUserId: string | null;
   onToggleLike: (postId: string) => void;
   onToggleFollow: (userId: string) => void;
   onDeletePost: (item: FeedItem) => void;
-  onRefreshFeed: () => void;
 }) {
   const [showAllComments, setShowAllComments] = useState(false);
   const [commentsExpanded, setCommentsExpanded] = useState(false);
   const [commentDraft, setCommentDraft] = useState('');
   const [sendingComment, setSendingComment] = useState(false);
   const [comments, setComments] = useState<Comment[]>(item.commentsList ?? []);
+  const [commentCount, setCommentCount] = useState(
+    item.commentsCount ?? item.commentsList?.length ?? 0
+  );
   const [commentError, setCommentError] = useState<string | null>(null);
 
   const toggleComments = () => {
@@ -419,6 +460,7 @@ function PostCard({
     try {
       const { comments: list } = await api.getComments(item.id);
       setComments(list);
+      setCommentCount(list.length);
     } catch (e) {
       console.warn('Erreur chargement commentaires :', e);
     }
@@ -432,23 +474,24 @@ function PostCard({
     const optimistic: Comment = {
       id: `temp-${Date.now()}`,
       post_id: item.id,
-      author_id: currentUserId,
+      author_id: currentUserId ?? '',
       text,
       created_at: new Date().toISOString(),
       author: { name: 'Moi' },
     };
     setComments((prev) => [...prev, optimistic]);
+    setCommentCount((prev) => prev + 1);
     setCommentDraft('');
     try {
-      const { comment } = await api.addComment(item.id, currentUserId, text);
+      const { comment } = await api.addComment(item.id, text);
       setComments((prev) => prev.map((c) => (c.id === optimistic.id ? comment : c)));
     } catch (e) {
       console.warn('Erreur ajout commentaire :', e);
       setComments((prev) => prev.filter((c) => c.id !== optimistic.id));
+      setCommentCount((prev) => Math.max(0, prev - 1));
       setCommentDraft(text);
     } finally {
       setSendingComment(false);
-      onRefreshFeed();
     }
   };
 
@@ -471,11 +514,13 @@ function PostCard({
   const confirmDeleteComment = async (comment: Comment) => {
     const previous = comments;
     setComments((prev) => prev.filter((c) => c.id !== comment.id));
+    setCommentCount((prev) => Math.max(0, prev - 1));
     try {
-      await api.deleteComment(item.id, comment.id, currentUserId);
+      await api.deleteComment(item.id, comment.id);
     } catch (e) {
       console.warn('Erreur suppression commentaire :', e);
       setComments(previous);
+      setCommentCount((prev) => prev + 1);
       setCommentError('Impossible de supprimer le commentaire.');
     }
   };
@@ -565,7 +610,7 @@ function PostCard({
             height={24}
             fill={commentsExpanded ? colors.primary : colors.textSecondary}
           />
-          <Text style={styles.commentCount}>{comments.length}</Text>
+          <Text style={styles.commentCount}>{commentCount}</Text>
         </TouchableOpacity>
       </View>
 
@@ -695,6 +740,7 @@ const styles = StyleSheet.create({
   root: { flex: 1 },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24 },
   list: { padding: 16, gap: 16, paddingBottom: 80 },
+  footerSpinner: { marginVertical: 12 },
 
 
 

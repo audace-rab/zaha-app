@@ -11,7 +11,7 @@ import 'react-native-url-polyfill/auto';
     try {
       // try assigning to protocol to detect readonly behavior
       (testUrl as any).protocol = 'https:';
-    } catch (err) {
+    } catch {
       const OrigURL = URL;
       class WritableURL extends (OrigURL as any) {
         set protocol(p: string) {
@@ -27,7 +27,7 @@ import 'react-native-url-polyfill/auto';
       }
       (globalThis as any).URL = WritableURL as any;
     }
-  } catch (e) {
+  } catch {
     // ignore
   }
 })();

@@ -9,16 +9,16 @@ export async function GET(
   try {
     const { id: userId } = await params;
     if (!isValidUuid(userId)) {
-      return errorResponse('User not found', 404);
+      return errorResponse('User not found', 404, request);
     }
     const result = await getFollowers(userId);
-    return jsonResponse(result);
+    return jsonResponse(result, 200, request);
   } catch (error) {
     console.error('GET /api/users/[id]/followers', error);
-    return errorResponse('Failed to fetch followers');
+    return errorResponse('Failed to fetch followers', 500, request);
   }
 }
 
-export async function OPTIONS() {
-  return optionsResponse();
+export async function OPTIONS(request: Request) {
+  return optionsResponse(request);
 }

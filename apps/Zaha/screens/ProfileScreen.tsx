@@ -117,11 +117,11 @@ export default function ProfileScreen({ onOpenFavorites, onOpenReservations }: P
       let avatarUrl: string | undefined;
 
       if (pendingAvatarUri && pendingAvatarBase64) {
-        const upload = await api.uploadAvatar(profile.id, pendingAvatarBase64);
+        const upload = await api.uploadAvatar(pendingAvatarBase64);
         avatarUrl = upload.url;
       }
 
-      const updated = await api.updateProfile(profile.id, {
+      const updated = await api.updateProfile({
         name: editName.trim(),
         bio: editBio.trim() || undefined,
         website: editWebsite.trim() || undefined,

@@ -4,12 +4,15 @@ import {
   FlatList,
   Keyboard,
   Linking,
+  PermissionsAndroid,
+  Platform,
   StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
+import Geolocation from '@react-native-community/geolocation';
 import { api } from '../lib/api';
 import FontIcon from '../components/FontIcon';
 import { colors, radius } from '../theme';
@@ -28,6 +31,7 @@ function formatTime(ts: number) {
   return d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
 }
 
+// Fallback si le GPS est indisponible ou la permission refusée (Antananarivo).
 const DEFAULT_COORDS = { latitude: -18.8792, longitude: 47.5079 };
 const INPUT_HEIGHT = 70;
 
@@ -43,7 +47,44 @@ export default function ChatScreen() {
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [keyboardHeight, setKeyboardHeight] = useState(0);
+  const [userCoords, setUserCoords] = useState(DEFAULT_COORDS);
   const listRef = useRef<FlatList<ChatMessage>>(null);
+
+  // Position réelle de l'utilisateur (silencieux : fallback Antananarivo si
+  // permission refusée ou GPS indisponible — la demande de permission est
+  // déjà gérée par le PermissionModal au premier lancement).
+  useEffect(() => {
+    let cancelled = false;
+    const resolvePosition = async () => {
+      try {
+        if (Platform.OS === 'android') {
+          const granted = await PermissionsAndroid.check(
+            PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION
+          );
+          if (!granted) return;
+        }
+        Geolocation.getCurrentPosition(
+          (position) => {
+            if (cancelled) return;
+            setUserCoords({
+              latitude: position.coords.latitude,
+              longitude: position.coords.longitude,
+            });
+          },
+          () => {
+            // Fallback silencieux sur DEFAULT_COORDS.
+          },
+          { enableHighAccuracy: false, timeout: 10000, maximumAge: 300000 }
+        );
+      } catch {
+        // Fallback silencieux sur DEFAULT_COORDS.
+      }
+    };
+    resolvePosition();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     listRef.current?.scrollToEnd({ animated: true });
@@ -63,7 +104,7 @@ export default function ChatScreen() {
   const performChat = async (history: ChatMessage[]) => {
     setLoading(true);
     try {
-      const response = await api.chat(history, DEFAULT_COORDS);
+      const response = await api.chat(history, userCoords);
       setMessages([
         ...history,
         {

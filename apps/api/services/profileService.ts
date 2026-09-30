@@ -1,7 +1,11 @@
+import type { SupabaseClient } from '@supabase/supabase-js';
 import { createAdminClient } from '@/lib/supabase/server';
+import type { Database } from '@/lib/supabase/database.types';
+
+type Client = SupabaseClient<Database>;
 
 /**
- * Récupère un profil par userId.
+ * Récupère un profil par userId (lecture publique).
  */
 export async function getProfile(userId: string) {
   const supabase = createAdminClient();
@@ -30,8 +34,9 @@ export interface UpdateProfileInput {
 /**
  * Met à jour le profil (champs fournis uniquement).
  * Retourne null si le profil n'existe pas.
+ * Le client passé doit être scopé à l'utilisateur (RLS appliqué).
  */
-export async function updateProfile(input: UpdateProfileInput) {
+export async function updateProfile(supabase: Client, input: UpdateProfileInput) {
   const patch: {
     updated_at: string;
     name?: string;
@@ -44,7 +49,6 @@ export async function updateProfile(input: UpdateProfileInput) {
   if (input.website !== undefined) patch.website = input.website.trim();
   if (input.avatar_url?.trim()) patch.avatar_url = input.avatar_url.trim();
 
-  const supabase = createAdminClient();
   const { data, error } = await supabase
     .from('profiles')
     .update(patch)

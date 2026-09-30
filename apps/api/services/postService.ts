@@ -1,4 +1,5 @@
-import { createAdminClient } from '@/lib/supabase/server';
+import type { SupabaseClient } from '@supabase/supabase-js';
+import type { Database } from '@/lib/supabase/database.types';
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -6,16 +7,18 @@ export function isValidUuid(value: string): boolean {
   return UUID_RE.test(value);
 }
 
+type Client = SupabaseClient<Database>;
+
 /**
  * Toggle like d'un post par un utilisateur.
  * Retourne null si le post n'existe pas.
+ * Le client passé doit être scopé à l'utilisateur (RLS appliqué).
  */
 export async function togglePostLike(
+  supabase: Client,
   postId: string,
   userId: string
 ): Promise<{ liked: boolean; likes: number } | null> {
-  const supabase = createAdminClient();
-
   // Le post doit exister
   const { data: post, error: postError } = await supabase
     .from('posts')

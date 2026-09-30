@@ -1,5 +1,5 @@
+import { requireUser } from '@/lib/api/auth';
 import { errorResponse, jsonResponse, optionsResponse } from '@/lib/api/response';
-import { createServerClient } from '@/lib/supabase/server';
 import { isValidUuid } from '@/services/postService';
 import { createAdminClient } from '@/lib/supabase/server';
 
@@ -13,6 +13,7 @@ export async function GET(
       return errorResponse('Post not found', 404);
     }
 
+    // Lecture publique des commentaires
     const supabase = createAdminClient();
 
     const { data: comments, error } = await supabase
@@ -51,20 +52,20 @@ export async function POST(
       return errorResponse('Post not found', 404);
     }
 
+    const auth = await requireUser(request);
+    if (!auth) {
+      return errorResponse('Authentication required', 401);
+    }
+
     const body = (await request.json()) as {
-      authorId?: string;
       text?: string;
     };
-
-    if (!body.authorId || !isValidUuid(body.authorId)) {
-      return errorResponse('authorId is required and must be a valid UUID', 400);
-    }
 
     if (!body.text || !body.text.trim()) {
       return errorResponse('text is required and must not be empty', 400);
     }
 
-    const supabase = createAdminClient();
+    const supabase = auth.supabase;
 
     const { data: post } = await supabase
       .from('posts')
@@ -76,9 +77,10 @@ export async function POST(
       return errorResponse('Post not found', 404);
     }
 
+    // RLS : author_id = auth.uid()
     const { data: comment, error } = await supabase
       .from('comments')
-      .insert({ post_id: postId, author_id: body.authorId, text: body.text.trim() })
+      .insert({ post_id: postId, author_id: auth.userId, text: body.text.trim() })
       .select(`
         *,
         author:profiles!comments_author_id_fkey ( name, avatar_url )

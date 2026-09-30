@@ -1,4 +1,8 @@
+import type { SupabaseClient } from '@supabase/supabase-js';
 import { createAdminClient } from '@/lib/supabase/server';
+import type { Database } from '@/lib/supabase/database.types';
+
+type Client = SupabaseClient<Database>;
 
 export interface ReservationRow {
   id: string;
@@ -33,8 +37,6 @@ export interface CreateReservationInput {
   guests?: number;
   roomType?: string;
   activitySlot?: string;
-  price?: number;
-  currency?: string;
   paymentMethod?: string;
   note?: string;
 }
@@ -42,12 +44,13 @@ export interface CreateReservationInput {
 /**
  * Créer une réservation.
  * Retourne null si le lieu n'existe pas.
+ * Le client passé doit être scopé à l'utilisateur (RLS appliqué).
+ * price / payment_status sont forcés côté serveur : jamais fournis par le client.
  */
 export async function createReservation(
+  supabase: Client,
   input: CreateReservationInput
 ): Promise<ReservationRow | null> {
-  const supabase = createAdminClient();
-
   const { data: place } = await supabase
     .from('places')
     .select('id')
@@ -67,9 +70,12 @@ export async function createReservation(
       guests: input.guests ?? 1,
       room_type: input.roomType ?? null,
       activity_slot: input.activitySlot ?? null,
-      price: input.price ?? 0,
-      currency: input.currency ?? 'MGA',
+      // Prix et paiement déterminés côté serveur uniquement
+      price: 0,
+      currency: 'MGA',
+      status: 'pending',
       payment_method: input.paymentMethod ?? null,
+      payment_status: 'unpaid',
       note: input.note ?? null,
     })
     .select('*')
@@ -85,13 +91,13 @@ export async function createReservation(
 
 /**
  * Lister les réservations d'un utilisateur.
+ * Client scopé utilisateur : le RLS ne retourne que ses réservations.
  */
 export async function getReservationsByUser(
+  supabase: Client,
   userId: string,
   status?: string
 ): Promise<ReservationRow[]> {
-  const supabase = createAdminClient();
-
   let query = supabase
     .from('reservations')
     .select(`
@@ -120,12 +126,12 @@ export async function getReservationsByUser(
 
 /**
  * Récupérer une réservation par son ID.
+ * Client scopé utilisateur : le RLS masque les réservations d'autrui (null → 404).
  */
 export async function getReservationById(
+  supabase: Client,
   reservationId: string
 ): Promise<ReservationRow | null> {
-  const supabase = createAdminClient();
-
   const { data, error } = await supabase
     .from('reservations')
     .select(`
@@ -149,28 +155,25 @@ export async function getReservationById(
 }
 
 /**
- * Mettre à jour une réservation (statut, détails, paiement).
- * Retourne null si introuvable ou si le propriétaire ne correspond pas.
+ * Mettre à jour une réservation (statut, détails).
+ * payment_status n'est JAMAIS modifiable via l'API client.
+ * Retourne null si introuvable ou si le propriétaire ne correspond pas (RLS).
  */
 export async function updateReservation(
+  supabase: Client,
   reservationId: string,
   patch: Partial<{
     status: string;
     paymentMethod: string;
-    paymentStatus: string;
     note: string;
     guests: number;
     timeStart: string;
     timeEnd: string;
   }>
 ): Promise<ReservationRow | null> {
-  const supabase = createAdminClient();
-
-  // Build typed partial — Supabase rejects Record<string, unknown>
   const updateData: {
     status?: string;
     payment_method?: string;
-    payment_status?: string;
     note?: string;
     guests?: number;
     time_start?: string;
@@ -181,7 +184,6 @@ export async function updateReservation(
   };
   if (patch.status !== undefined) updateData.status = patch.status;
   if (patch.paymentMethod !== undefined) updateData.payment_method = patch.paymentMethod;
-  if (patch.paymentStatus !== undefined) updateData.payment_status = patch.paymentStatus;
   if (patch.note !== undefined) updateData.note = patch.note;
   if (patch.guests !== undefined) updateData.guests = patch.guests;
   if (patch.timeStart !== undefined) updateData.time_start = patch.timeStart;
@@ -204,14 +206,13 @@ export async function updateReservation(
 
 /**
  * Annuler une réservation (met le statut à 'cancelled').
- * Vérifie que la réservation appartient bien à l'utilisateur.
+ * Client scopé utilisateur : le RLS garantit l'appartenance.
  */
 export async function cancelReservation(
+  supabase: Client,
   reservationId: string,
   userId: string
 ): Promise<boolean> {
-  const supabase = createAdminClient();
-
   const { data: existing } = await supabase
     .from('reservations')
     .select('id, status')
@@ -238,11 +239,11 @@ export async function cancelReservation(
 
 /**
  * Vérifier la disponibilité d'un lieu pour une date donnée.
- * Retourne les créneaux existants (non annulés) pour ce lieu à cette date.
+ * Retourne les créneaux existants (non annulés) SANS exposer les user_id.
+ * Client admin requis : le RLS "owner-only" masquerait les réservations des autres.
  */
 export interface AvailabilitySlot {
   id: string;
-  user_id: string;
   date: string;
   time_start: string | null;
   time_end: string | null;
@@ -259,7 +260,7 @@ export async function getAvailability(
 
   const { data, error } = await supabase
     .from('reservations')
-    .select('id, user_id, date, time_start, time_end, guests, status, reservation_type')
+    .select('id, date, time_start, time_end, guests, status, reservation_type')
     .eq('place_id', placeId)
     .eq('date', date)
     .neq('status', 'cancelled')
