@@ -26,7 +26,6 @@ type FeedItem = {
   location: string;
   timestamp: string;
   hasLiked?: boolean;
-  isFollowing?: boolean;
 };
 
 export type Comment = {
@@ -348,25 +347,6 @@ export const api = {
 
   fetchCategories: () =>
     apiFetch<{ categories: CategoryCount[] }>('/api/places/categories'),
-
-  followUser: (userId: string) =>
-    apiFetch<{ following: boolean }>(`/api/users/${userId}/follow`, {
-      method: 'POST',
-    }),
-
-  unfollowUser: (userId: string) =>
-    apiFetch<{ following: boolean }>(`/api/users/${userId}/follow`, {
-      method: 'DELETE',
-    }),
-
-  isFollowing: (userId: string) =>
-    apiFetch<{ following: boolean }>(`/api/users/${userId}/is-following`),
-
-  fetchFollowers: (userId: string) =>
-    apiFetch<{ users: Profile[] }>(`/api/users/${userId}/followers`),
-
-  fetchFollowing: (userId: string) =>
-    apiFetch<{ users: Profile[] }>(`/api/users/${userId}/following`),
 
   createPost: (content: string, location?: string, media?: { url: string; type: string }[]) =>
     apiFetch<{ post: FeedItem }>('/api/posts', {

@@ -55,7 +55,6 @@ type FeedItem = {
   location: string;
   timestamp: string;
   hasLiked?: boolean;
-  isFollowing?: boolean;
 };
 
 type FeedScreenProps = {
@@ -172,31 +171,6 @@ export default function FeedScreen({ query, onClearSearch }: FeedScreenProps) {
       })
       .catch((e: Error) => {
         console.warn('Erreur like/unlike :', e.message);
-        setFeed(applyToggle);
-      });
-  };
-
-  // Follow
-  const handleToggleFollow = (userId: string) => {
-    const applyToggle = (list: FeedItem[]) =>
-      list.map((item) =>
-        item.authorId === userId ? { ...item, isFollowing: !item.isFollowing } : item
-      );
-    setFeed(applyToggle);
-    const current = feed.find((i) => i.authorId === userId)?.isFollowing;
-    const request = current
-      ? api.unfollowUser(userId)
-      : api.followUser(userId);
-    request
-      .then(({ following }) => {
-        setFeed((prev) =>
-          prev.map((item) =>
-            item.authorId === userId ? { ...item, isFollowing: following } : item
-          )
-        );
-      })
-      .catch((e: Error) => {
-        console.warn('Erreur follow/unfollow :', e.message);
         setFeed(applyToggle);
       });
   };
@@ -347,7 +321,6 @@ export default function FeedScreen({ query, onClearSearch }: FeedScreenProps) {
             item={item}
             currentUserId={currentUserId}
             onToggleLike={handleToggleLike}
-            onToggleFollow={handleToggleFollow}
             onDeletePost={handleDeletePost}
           />
         )}
@@ -426,13 +399,11 @@ function PostCard({
   item,
   currentUserId,
   onToggleLike,
-  onToggleFollow,
   onDeletePost,
 }: {
   item: FeedItem;
   currentUserId: string | null;
   onToggleLike: (postId: string) => void;
-  onToggleFollow: (userId: string) => void;
   onDeletePost: (item: FeedItem) => void;
 }) {
   const [showAllComments, setShowAllComments] = useState(false);
@@ -540,18 +511,6 @@ function PostCard({
           <Text style={styles.location}>{item.location}</Text>
           {item.timestamp ? <Text style={styles.timestamp}>{formatRelativeTime(item.timestamp)}</Text> : null}
         </View>
-        {item.authorId && item.authorId !== currentUserId && (
-          <TouchableOpacity
-            style={[styles.followBtn, item.isFollowing && styles.followBtnActive]}
-            onPress={() => onToggleFollow(item.authorId)}
-            accessibilityRole="button"
-            accessibilityLabel={item.isFollowing ? `Ne plus suivre ${item.author}` : `Suivre ${item.author}`}
-          >
-            <Text style={[styles.followText, item.isFollowing && styles.followTextActive]}>
-              {item.isFollowing ? 'Suivi' : 'Suivre'}
-            </Text>
-          </TouchableOpacity>
-        )}
         {item.authorId === currentUserId && (
           <TouchableOpacity
             style={styles.deleteBtn}
@@ -635,7 +594,6 @@ function PostCard({
                   <View style={styles.commentBubble}>
                     <Text style={styles.commentAuthor}>
                       {c.author?.name ?? c.author_name ?? 'Anonyme'}
-                      {isMine ? ' · toi' : ''}
                     </Text>
                     <Text style={styles.commentText}>{c.text}</Text>
                     {c.created_at ? <Text style={styles.timestamp}>{formatRelativeTime(c.created_at)}</Text> : null}
@@ -753,12 +711,7 @@ const styles = StyleSheet.create({
   location: { color: colors.textSecondary, fontSize: 13 },
   timestamp: { color: colors.textMuted, fontSize: 12, marginTop: 2 },
 
-  // Follow
-  followBtn: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: radius.xl, borderWidth: 1, borderColor: colors.primary, minHeight: 36, justifyContent: 'center' },
   deleteBtn: { padding: 8, borderRadius: radius.xl, justifyContent: 'center', alignItems: 'center' },
-  followBtnActive: { backgroundColor: colors.primary },
-  followText: { fontSize: 13, color: colors.primary, fontWeight: '600' },
-  followTextActive: { color: colors.surface },
 
   // Media
   media: { width: '100%', height: 220 },
