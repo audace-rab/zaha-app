@@ -7,6 +7,8 @@ const STATUS_LABELS: Record<string, string> = {
   confirmed: 'Confirmée',
   cancelled: 'Annulée',
   completed: 'Terminée',
+  unavailable: 'Indisponible',
+  proposed: 'Créneau proposé',
 };
 
 export default async function DashboardPage() {

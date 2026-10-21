@@ -6,6 +6,7 @@ interface ReservationRow {
   id: string;
   date: string;
   time_start: string | null;
+  time_end: string | null;
   guests: number;
   reservation_type: string;
   status: string;
@@ -24,6 +25,8 @@ const STATUS_LABELS: Record<string, string> = {
   confirmed: 'Confirmée',
   cancelled: 'Annulée',
   completed: 'Terminée',
+  unavailable: 'Indisponible',
+  proposed: 'Créneau proposé',
 };
 
 const STATUS_STYLES: Record<string, string> = {
@@ -31,7 +34,14 @@ const STATUS_STYLES: Record<string, string> = {
   confirmed: 'bg-emerald-100 text-emerald-700',
   cancelled: 'bg-red-100 text-red-700',
   completed: 'bg-slate-200 text-slate-700',
+  unavailable: 'bg-orange-100 text-orange-700',
+  proposed: 'bg-violet-100 text-violet-700',
 };
+
+/** "19:00:00" -> "19:00" (champ <input type="time">). */
+function toTimeInput(value: string | null): string {
+  return value ? value.slice(0, 5) : '';
+}
 
 const PAYMENT_LABELS: Record<string, string> = {
   unpaid: 'Non payé',
@@ -89,6 +99,84 @@ export default function ReservationsPage() {
       );
     } else {
       alert('Échec du changement de statut.');
+    }
+  }
+
+  // --- Reprogrammation : proposer un autre créneau à une réservation indisponible ---
+  const [rescheduling, setRescheduling] = useState<ReservationRow | null>(null);
+  const [slotDate, setSlotDate] = useState('');
+  const [slotStart, setSlotStart] = useState('');
+  const [slotEnd, setSlotEnd] = useState('');
+  const [slotSaving, setSlotSaving] = useState(false);
+  const [slotError, setSlotError] = useState<string | null>(null);
+
+  function openReschedule(r: ReservationRow) {
+    setRescheduling(r);
+    setSlotDate(r.date);
+    setSlotStart(toTimeInput(r.time_start));
+    setSlotEnd(toTimeInput(r.time_end));
+    setSlotError(null);
+  }
+
+  async function submitReschedule(e: React.FormEvent) {
+    e.preventDefault();
+    if (!rescheduling) return;
+
+    if (!slotDate) {
+      setSlotError('Choisissez une date.');
+      return;
+    }
+    if (slotStart && slotEnd && slotEnd <= slotStart) {
+      setSlotError("L'heure de fin doit être après l'heure de début.");
+      return;
+    }
+    const unchanged =
+      slotDate === rescheduling.date &&
+      slotStart === toTimeInput(rescheduling.time_start) &&
+      slotEnd === toTimeInput(rescheduling.time_end);
+    if (unchanged) {
+      setSlotError('Proposez un créneau différent du créneau actuel.');
+      return;
+    }
+
+    setSlotSaving(true);
+    setSlotError(null);
+    try {
+      // Le créneau est seulement PROPOSÉ : le client doit le confirmer depuis l'application.
+      const res = await fetch(`/api/admin/reservations/${rescheduling.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          date: slotDate,
+          timeStart: slotStart || null,
+          timeEnd: slotEnd || null,
+          status: 'proposed',
+        }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        setSlotError(data.error ?? 'Échec de la reprogrammation.');
+        return;
+      }
+      const id = rescheduling.id;
+      setReservations((rows) =>
+        rows.map((r) =>
+          r.id === id
+            ? {
+                ...r,
+                date: slotDate,
+                time_start: slotStart || null,
+                time_end: slotEnd || null,
+                status: 'proposed',
+              }
+            : r
+        )
+      );
+      setRescheduling(null);
+    } catch {
+      setSlotError('Une erreur est survenue.');
+    } finally {
+      setSlotSaving(false);
     }
   }
 
@@ -193,7 +281,10 @@ export default function ReservationsPage() {
                   <td className="px-4 py-3 text-slate-900">
                     {new Date(r.date).toLocaleDateString('fr-FR')}
                     {r.time_start && (
-                      <span className="block text-xs text-slate-500">{r.time_start}</span>
+                      <span className="block text-xs text-slate-500">
+                        {toTimeInput(r.time_start)}
+                        {r.time_end ? ` – ${toTimeInput(r.time_end)}` : ''}
+                      </span>
                     )}
                   </td>
                   <td className="px-4 py-3 font-medium text-slate-900">
@@ -226,6 +317,14 @@ export default function ReservationsPage() {
                         </option>
                       ))}
                     </select>
+                    {(r.status === 'unavailable' || r.status === 'proposed') && (
+                      <button
+                        onClick={() => openReschedule(r)}
+                        className="mt-2 block rounded-lg border border-orange-300 px-2.5 py-1 text-xs font-medium text-orange-700 transition hover:bg-orange-50"
+                      >
+                        {r.status === 'proposed' ? 'Proposer un autre créneau' : 'Reprogrammer'}
+                      </button>
+                    )}
                   </td>
                 </tr>
               ))
@@ -255,6 +354,102 @@ export default function ReservationsPage() {
           </button>
         </div>
       </div>
+
+      {rescheduling && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 px-4"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="reschedule-title"
+        >
+          <form
+            onSubmit={submitReschedule}
+            className="w-full max-w-md space-y-4 rounded-xl bg-white p-6 shadow-xl"
+          >
+            <div>
+              <h2 id="reschedule-title" className="text-lg font-semibold text-slate-900">
+                Reprogrammer la réservation
+              </h2>
+              <p className="mt-1 text-sm text-slate-500">
+                {rescheduling.placeName ?? 'Lieu'} · {rescheduling.userName ?? 'Client'} · créneau
+                indisponible du {new Date(rescheduling.date).toLocaleDateString('fr-FR')}
+                {rescheduling.time_start ? ` à ${toTimeInput(rescheduling.time_start)}` : ''}
+              </p>
+            </div>
+
+            {slotError && (
+              <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+                {slotError}
+              </div>
+            )}
+
+            <div className="space-y-2">
+              <label htmlFor="slot-date" className="block text-sm font-medium text-slate-700">
+                Nouvelle date
+              </label>
+              <input
+                id="slot-date"
+                type="date"
+                required
+                min={new Date().toISOString().slice(0, 10)}
+                value={slotDate}
+                onChange={(e) => setSlotDate(e.target.value)}
+                className={`${selectClass} w-full`}
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-2">
+                <label htmlFor="slot-start" className="block text-sm font-medium text-slate-700">
+                  Heure de début
+                </label>
+                <input
+                  id="slot-start"
+                  type="time"
+                  value={slotStart}
+                  onChange={(e) => setSlotStart(e.target.value)}
+                  className={`${selectClass} w-full`}
+                />
+              </div>
+              <div className="space-y-2">
+                <label htmlFor="slot-end" className="block text-sm font-medium text-slate-700">
+                  Heure de fin
+                </label>
+                <input
+                  id="slot-end"
+                  type="time"
+                  value={slotEnd}
+                  onChange={(e) => setSlotEnd(e.target.value)}
+                  className={`${selectClass} w-full`}
+                />
+              </div>
+            </div>
+
+            <p className="text-xs text-slate-500">
+              Le client devra confirmer ce nouveau créneau depuis l’application. La réservation passe
+              en « Créneau proposé » en attendant sa réponse.
+            </p>
+
+            <div className="flex justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => setRescheduling(null)}
+                disabled={slotSaving}
+                className="rounded-lg border border-slate-300 px-4 py-2 text-sm text-slate-700 transition hover:bg-slate-100 disabled:opacity-50"
+              >
+                Annuler
+              </button>
+              <button
+                type="submit"
+                disabled={slotSaving}
+                className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-slate-700 disabled:opacity-50"
+              >
+                {slotSaving ? 'Enregistrement…' : 'Proposer ce créneau'}
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
     </div>
   );
 }

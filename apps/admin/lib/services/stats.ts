@@ -36,28 +36,44 @@ async function countRows(supabase: SupabaseClient<Database>, table: keyof Databa
 }
 
 export async function getAdminStats(supabase: SupabaseClient<Database>): Promise<AdminStats> {
-  const [users, places, posts, reviews, reservations, comments] = await Promise.all([
+  // Toutes les requêtes en parallèle (1 aller-retour réseau au lieu de 4).
+  const [
+    users,
+    places,
+    posts,
+    reviews,
+    reservations,
+    comments,
+    { data: statusRows },
+    { data: recentReservationsRaw },
+    { data: recentUsersRaw },
+  ] = await Promise.all([
     countRows(supabase, 'profiles'),
     countRows(supabase, 'places'),
     countRows(supabase, 'posts'),
     countRows(supabase, 'place_reviews'),
     countRows(supabase, 'reservations'),
     countRows(supabase, 'comments'),
+    // Répartition des réservations par statut
+    supabase.from('reservations').select('status'),
+    // Réservations récentes (avec noms du client et du lieu)
+    supabase
+      .from('reservations')
+      .select('id, date, status, price, currency, profiles(name), places(name)')
+      .order('created_at', { ascending: false })
+      .limit(5),
+    // Derniers inscrits
+    supabase
+      .from('profiles')
+      .select('id, name, country, created_at')
+      .order('created_at', { ascending: false })
+      .limit(5),
   ]);
 
-  // Répartition des réservations par statut
-  const { data: statusRows } = await supabase.from('reservations').select('status');
   const reservationsByStatus: Record<string, number> = {};
   for (const row of statusRows ?? []) {
     reservationsByStatus[row.status] = (reservationsByStatus[row.status] ?? 0) + 1;
   }
-
-  // Réservations récentes (avec noms du client et du lieu)
-  const { data: recentReservationsRaw } = await supabase
-    .from('reservations')
-    .select('id, date, status, price, currency, profiles(name), places(name)')
-    .order('created_at', { ascending: false })
-    .limit(5);
 
   const recentReservations = (recentReservationsRaw ?? []).map((r) => {
     const profile = r.profiles as unknown as { name: string } | null;
@@ -72,13 +88,6 @@ export async function getAdminStats(supabase: SupabaseClient<Database>): Promise
       placeName: place?.name ?? null,
     };
   });
-
-  // Derniers inscrits
-  const { data: recentUsersRaw } = await supabase
-    .from('profiles')
-    .select('id, name, country, created_at')
-    .order('created_at', { ascending: false })
-    .limit(5);
 
   return {
     counts: { users, places, posts, reviews, reservations, comments },

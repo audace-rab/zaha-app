@@ -16,10 +16,11 @@ import {
   View,
 } from 'react-native';
 import { launchImageLibrary } from 'react-native-image-picker';
-import { api, type Comment } from '../lib/api';
+import { api, type Comment, type FeedPlace, type MapPlace } from '../lib/api';
 import { readCache, writeCache } from '../lib/cache';
 import { useAuthUser } from '../lib/useAuthUser';
 import FontIcon from '../components/FontIcon';
+import ReservationScreen from './ReservationScreen';
 import { colors, radius } from '../theme';
 
 const FEED_CACHE_KEY = 'cache:feed:v1';
@@ -53,6 +54,7 @@ type FeedItem = {
   commentsCount?: number;
   isBusiness: boolean;
   location: string;
+  place?: FeedPlace;
   timestamp: string;
   hasLiked?: boolean;
 };
@@ -79,6 +81,16 @@ export default function FeedScreen({ query, onClearSearch }: FeedScreenProps) {
   const [postPhotos, setPostPhotos] = useState<{ uri: string; type: 'image' | 'video' }[]>([]);
   const [creatingPost, setCreatingPost] = useState(false);
   const [keyboardHeight, setKeyboardHeight] = useState(0);
+
+  // Lieu rattaché au nouveau post (optionnel)
+  const [postPlace, setPostPlace] = useState<MapPlace | null>(null);
+  const [placePickerOpen, setPlacePickerOpen] = useState(false);
+  const [placeFilter, setPlaceFilter] = useState('');
+  const [placeOptions, setPlaceOptions] = useState<MapPlace[]>([]);
+  const [placesLoading, setPlacesLoading] = useState(false);
+
+  // Réservation lancée depuis un post d'un lieu VIP
+  const [reservePlace, setReservePlace] = useState<FeedPlace | null>(null);
 
   useEffect(() => {
     const showSub = Keyboard.addListener('keyboardDidShow', (e) => {
@@ -225,6 +237,28 @@ export default function FeedScreen({ query, onClearSearch }: FeedScreenProps) {
     setPostPhotos((prev) => prev.filter((_, i) => i !== index));
   };
 
+  // Liste des lieux chargée à la première ouverture du sélecteur.
+  const togglePlacePicker = () => {
+    const next = !placePickerOpen;
+    setPlacePickerOpen(next);
+    if (next && placeOptions.length === 0 && !placesLoading) {
+      setPlacesLoading(true);
+      api
+        .fetchPlaces()
+        .then(({ places }) => setPlaceOptions(places))
+        .catch((e: Error) => console.warn('Erreur chargement lieux :', e.message))
+        .finally(() => setPlacesLoading(false));
+    }
+  };
+
+  const resetCreateForm = () => {
+    setPostContent('');
+    setPostPhotos([]);
+    setPostPlace(null);
+    setPlacePickerOpen(false);
+    setPlaceFilter('');
+  };
+
   const submitPost = async () => {
     if (!postContent.trim() && postPhotos.length === 0) return;
     setCreatingPost(true);
@@ -234,9 +268,13 @@ export default function FeedScreen({ query, onClearSearch }: FeedScreenProps) {
         const { url } = await api.uploadPostMedia(item.uri);
         media.push({ url, type: item.type });
       }
-      await api.createPost(postContent.trim(), undefined, media.length > 0 ? media : undefined);
-      setPostContent('');
-      setPostPhotos([]);
+      await api.createPost(
+        postContent.trim(),
+        undefined,
+        media.length > 0 ? media : undefined,
+        postPlace?.id
+      );
+      resetCreateForm();
       setCreateVisible(false);
       await load(query);
     } catch (e: any) {
@@ -263,6 +301,11 @@ export default function FeedScreen({ query, onClearSearch }: FeedScreenProps) {
   }
 
   const hasFilter = Boolean(query);
+
+  const normalizedPlaceFilter = placeFilter.trim().toLowerCase();
+  const filteredPlaces = normalizedPlaceFilter
+    ? placeOptions.filter((p) => p.name.toLowerCase().includes(normalizedPlaceFilter))
+    : placeOptions;
 
   return (
     <View style={styles.root}>
@@ -322,6 +365,7 @@ export default function FeedScreen({ query, onClearSearch }: FeedScreenProps) {
             currentUserId={currentUserId}
             onToggleLike={handleToggleLike}
             onDeletePost={handleDeletePost}
+            onReserve={setReservePlace}
           />
         )}
       />
@@ -342,7 +386,7 @@ export default function FeedScreen({ query, onClearSearch }: FeedScreenProps) {
           <View style={[styles.modalCard, { marginBottom: keyboardHeight }]}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Nouveau post</Text>
-              <TouchableOpacity onPress={() => { setCreateVisible(false); setPostContent(''); setPostPhotos([]); }} accessibilityRole="button" accessibilityLabel="Fermer">
+              <TouchableOpacity onPress={() => { setCreateVisible(false); resetCreateForm(); }} accessibilityRole="button" accessibilityLabel="Fermer">
                 <Text style={styles.modalClose}>✕</Text>
               </TouchableOpacity>
             </View>
@@ -354,6 +398,75 @@ export default function FeedScreen({ query, onClearSearch }: FeedScreenProps) {
               multiline
               maxLength={2000}
             />
+
+            {/* Lieu rattaché (optionnel) : un lieu VIP ajoute un bouton de réservation au post */}
+            <TouchableOpacity
+              style={styles.placeSelect}
+              onPress={togglePlacePicker}
+              accessibilityRole="button"
+              accessibilityLabel={postPlace ? `Lieu lié : ${postPlace.name}` : 'Lier un lieu au post'}
+              accessibilityState={{ expanded: placePickerOpen }}
+            >
+              <FontIcon name="location-dot" width={14} height={14} fill={colors.textSecondary} />
+              <Text
+                style={[styles.placeSelectText, !postPlace && styles.placeSelectPlaceholder]}
+                numberOfLines={1}
+              >
+                {postPlace ? postPlace.name : 'Lier un lieu (optionnel)'}
+              </Text>
+              {postPlace?.status === 'vip' ? <Text style={styles.vipBadge}>VIP</Text> : null}
+              {postPlace ? (
+                <TouchableOpacity
+                  onPress={() => setPostPlace(null)}
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                  accessibilityRole="button"
+                  accessibilityLabel="Retirer le lieu"
+                >
+                  <Text style={styles.modalClose}>✕</Text>
+                </TouchableOpacity>
+              ) : null}
+            </TouchableOpacity>
+            {placePickerOpen && (
+              <View style={styles.placePicker}>
+                <TextInput
+                  style={styles.placeFilter}
+                  value={placeFilter}
+                  onChangeText={setPlaceFilter}
+                  placeholder="Rechercher un lieu…"
+                  placeholderTextColor="#9ca3af"
+                />
+                {placesLoading ? (
+                  <ActivityIndicator style={styles.placeLoading} color="#2563eb" />
+                ) : (
+                  <ScrollView
+                    style={styles.placeList}
+                    nestedScrollEnabled
+                    keyboardShouldPersistTaps="handled"
+                  >
+                    {filteredPlaces.length === 0 ? (
+                      <Text style={styles.placeEmpty}>Aucun lieu trouvé.</Text>
+                    ) : (
+                      filteredPlaces.map((p) => (
+                        <TouchableOpacity
+                          key={p.id}
+                          style={styles.placeRow}
+                          onPress={() => {
+                            setPostPlace(p);
+                            setPlacePickerOpen(false);
+                            setPlaceFilter('');
+                          }}
+                          accessibilityRole="button"
+                          accessibilityLabel={`Choisir ${p.name}`}
+                        >
+                          <Text style={styles.placeRowName} numberOfLines={1}>{p.name}</Text>
+                          {p.status === 'vip' ? <Text style={styles.vipBadge}>VIP</Text> : null}
+                        </TouchableOpacity>
+                      ))
+                    )}
+                  </ScrollView>
+                )}
+              </View>
+            )}
             {postPhotos.length > 0 && (
               <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.modalPhotos}>
                 {postPhotos.map((item, i) => (
@@ -391,6 +504,41 @@ export default function FeedScreen({ query, onClearSearch }: FeedScreenProps) {
           </View>
         </View>
       </Modal>
+
+      {/* Réservation depuis un post d'un lieu VIP */}
+      <Modal
+        visible={reservePlace !== null}
+        animationType="slide"
+        onRequestClose={() => setReservePlace(null)}
+      >
+        <View style={styles.reserveModal}>
+          <View style={styles.reserveHeader}>
+            <Text style={styles.reserveTitle}>Réserver</Text>
+            <TouchableOpacity
+              onPress={() => setReservePlace(null)}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              accessibilityRole="button"
+              accessibilityLabel="Fermer"
+            >
+              <Text style={styles.modalClose}>✕</Text>
+            </TouchableOpacity>
+          </View>
+          {reservePlace ? (
+            <ReservationScreen
+              place={{
+                id: reservePlace.id,
+                name: reservePlace.name,
+                category: reservePlace.category,
+                address: reservePlace.address,
+              }}
+              onCreated={() =>
+                Alert.alert('Réservation envoyée', `Votre demande pour « ${reservePlace.name} » a bien été envoyée.`)
+              }
+              onDone={() => setReservePlace(null)}
+            />
+          ) : null}
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -400,11 +548,13 @@ function PostCard({
   currentUserId,
   onToggleLike,
   onDeletePost,
+  onReserve,
 }: {
   item: FeedItem;
   currentUserId: string | null;
   onToggleLike: (postId: string) => void;
   onDeletePost: (item: FeedItem) => void;
+  onReserve: (place: FeedPlace) => void;
 }) {
   const [showAllComments, setShowAllComments] = useState(false);
   const [commentsExpanded, setCommentsExpanded] = useState(false);
@@ -499,6 +649,12 @@ function PostCard({
   const visibleComments = showAllComments ? comments : comments.slice(0, 3);
   const hiddenCount = comments.length - visibleComments.length;
 
+  // Lieu VIP rattaché : badge + bouton de réservation
+  const vipPlace = item.place?.status === 'vip' ? item.place : null;
+  const locationLabel = item.place
+    ? [item.place.name, item.location].filter(Boolean).join(' · ')
+    : item.location;
+
   return (
     <View style={styles.card}>
       <View style={styles.header}>
@@ -508,7 +664,12 @@ function PostCard({
             {item.authorCountryFlag ? `${item.authorCountryFlag} ` : ''}
             {item.author}
           </Text>
-          <Text style={styles.location}>{item.location}</Text>
+          <View style={styles.locationRow}>
+            <Text style={[styles.location, styles.locationText]} numberOfLines={1}>
+              {locationLabel}
+            </Text>
+            {vipPlace ? <Text style={styles.vipBadge}>VIP</Text> : null}
+          </View>
           {item.timestamp ? <Text style={styles.timestamp}>{formatRelativeTime(item.timestamp)}</Text> : null}
         </View>
         {item.authorId === currentUserId && (
@@ -571,6 +732,17 @@ function PostCard({
           />
           <Text style={styles.commentCount}>{commentCount}</Text>
         </TouchableOpacity>
+        {vipPlace ? (
+          <TouchableOpacity
+            style={styles.reserveButton}
+            onPress={() => onReserve(vipPlace)}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            accessibilityRole="button"
+            accessibilityLabel={`Réserver chez ${vipPlace.name}`}
+          >
+            <FontIcon name="calendar" width={24} height={24} fill={colors.vip} />
+          </TouchableOpacity>
+        ) : null}
       </View>
 
       {/* Commentaires */}
@@ -739,6 +911,82 @@ const styles = StyleSheet.create({
   likeCountActive: { color: colors.like },
   commentButton: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   commentCount: { color: colors.textSecondary, fontSize: 14, fontWeight: '600' },
+  reserveButton: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  locationRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  locationText: { flexShrink: 1 },
+  vipBadge: {
+    backgroundColor: colors.vipBg,
+    color: colors.vip,
+    borderWidth: 1,
+    borderColor: colors.vipBorder,
+    fontSize: 10,
+    fontWeight: '800',
+    paddingHorizontal: 6,
+    paddingVertical: 1,
+    borderRadius: 4,
+    overflow: 'hidden',
+  },
+
+  // Réservation depuis un post VIP
+  reserveModal: { flex: 1, backgroundColor: colors.background },
+  reserveHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingTop: 16,
+    paddingBottom: 8,
+    backgroundColor: colors.surface,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+  reserveTitle: { fontSize: 18, fontWeight: '700', color: colors.textPrimary },
+
+  // Sélecteur de lieu (création de post)
+  placeSelect: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    borderWidth: 1,
+    borderColor: colors.borderStrong,
+    borderRadius: radius.md,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    backgroundColor: colors.surface,
+  },
+  placeSelectText: { flex: 1, fontSize: 14, color: colors.textPrimary },
+  placeSelectPlaceholder: { color: colors.textMuted },
+  placePicker: {
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    backgroundColor: colors.surface,
+    padding: 8,
+    gap: 8,
+  },
+  placeFilter: {
+    borderWidth: 1,
+    borderColor: colors.borderStrong,
+    borderRadius: radius.sm,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    fontSize: 14,
+    color: colors.textPrimary,
+    backgroundColor: colors.inputBg,
+  },
+  placeList: { maxHeight: 180 },
+  placeLoading: { paddingVertical: 16 },
+  placeEmpty: { color: colors.textMuted, fontSize: 13, textAlign: 'center', paddingVertical: 12 },
+  placeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingVertical: 10,
+    paddingHorizontal: 6,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+  placeRowName: { flex: 1, fontSize: 14, color: colors.textStrong },
 
   // Comments
   commentsScroll: { maxHeight: 220 },

@@ -4,6 +4,8 @@ import type { Database } from '@/lib/supabase/database.types';
 
 type PlaceUpdate = Database['public']['Tables']['places']['Update'];
 
+const PLACE_STATUSES = ['normal', 'vip'];
+
 export async function GET(
   _request: Request,
   { params }: { params: Promise<{ id: string }> }
@@ -57,12 +59,26 @@ export async function PATCH(
     const fields = [
       'name', 'category', 'place_type', 'address', 'snippet',
       'opening_hours', 'rating', 'latitude', 'longitude',
-      'google_maps_uri', 'photo_url', 'is_pro', 'city_id', 'external_id',
+      'google_maps_uri', 'photo_url', 'status', 'city_id', 'external_id',
     ] as const;
     for (const field of fields) {
       if (body[field] !== undefined) {
         (payload as Record<string, unknown>)[field] = body[field];
       }
+    }
+
+    if (payload.status !== undefined && !PLACE_STATUSES.includes(payload.status)) {
+      return errorResponse(`status must be one of: ${PLACE_STATUSES.join(', ')}`, 400);
+    }
+
+    // Carrousel : l'ordre du tableau est conservé, la 1re photo devient la couverture.
+    if (body.photos !== undefined) {
+      if (!(Array.isArray(body.photos) && body.photos.every((u) => typeof u === 'string'))) {
+        return errorResponse('photos must be an array of URLs', 400);
+      }
+      const photos = body.photos.map((u) => u.trim()).filter(Boolean);
+      payload.photos = photos;
+      payload.photo_url = photos[0] ?? null;
     }
 
     if (Object.keys(payload).length === 0) {

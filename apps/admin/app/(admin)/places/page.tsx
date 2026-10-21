@@ -116,7 +116,7 @@ export default function PlacesPage() {
               <th className="px-4 py-3">Catégorie</th>
               <th className="px-4 py-3">Adresse</th>
               <th className="px-4 py-3">Note</th>
-              <th className="px-4 py-3">Pro</th>
+              <th className="px-4 py-3">Statut</th>
               <th className="px-4 py-3 text-right">Actions</th>
             </tr>
           </thead>
@@ -145,12 +145,12 @@ export default function PlacesPage() {
                     {place.rating != null ? place.rating.toFixed(1) : '—'}
                   </td>
                   <td className="px-4 py-3">
-                    {place.is_pro ? (
-                      <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-700">
-                        Pro
+                    {place.status === 'vip' ? (
+                      <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700">
+                        VIP
                       </span>
                     ) : (
-                      <span className="text-slate-400">—</span>
+                      <span className="text-slate-500">Normal</span>
                     )}
                   </td>
                   <td className="px-4 py-3 text-right">

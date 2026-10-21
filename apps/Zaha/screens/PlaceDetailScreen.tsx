@@ -34,7 +34,7 @@ type Place = {
   photoUrl?: string;
   photos?: string[];
   openingHours?: string;
-  isPro?: boolean;
+  status?: 'normal' | 'vip';
   location?: { latitude: number; longitude: number };
 };
 
@@ -319,7 +319,7 @@ export default function PlaceDetailScreen({ place }: PlaceDetailScreenProps) {
         )}
 
         <View style={styles.titleRow}>
-          {place.isPro && <Text style={styles.proBadge}>PRO</Text>}
+          {place.status === 'vip' && <Text style={styles.vipBadge}>VIP</Text>}
           <Text style={styles.name}>{place.name}</Text>
         </View>
 
@@ -699,11 +699,13 @@ const styles = StyleSheet.create({
   directionsButtonContent: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   body: { padding: 16, gap: 8 },
   titleRow: { flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' },
-  proBadge: {
-    backgroundColor: colors.primary,
-    color: colors.surface,
+  vipBadge: {
+    backgroundColor: colors.vipBg,
+    color: colors.vip,
+    borderWidth: 1,
+    borderColor: colors.vipBorder,
     fontSize: 11,
-    fontWeight: '700',
+    fontWeight: '800',
     paddingHorizontal: 6,
     paddingVertical: 2,
     borderRadius: 4,

@@ -52,14 +52,19 @@ export async function PUT(
       paymentMethod?: string;
       note?: string;
       guests?: number;
+      roomType?: string;
+      activitySlot?: string;
+      date?: string;
       timeStart?: string;
       timeEnd?: string;
     };
 
-    // Le client ne peut que remettre en attente ou annuler —
-    // confirmed/completed sont réservés à un futur back-office.
-    if (body.status && !['pending', 'cancelled'].includes(body.status)) {
-      return errorResponse('status must be one of: pending, cancelled', 400);
+
+    if (body.date !== undefined && !/^\d{4}-\d{2}-\d{2}$/.test(body.date)) {
+      return errorResponse('date must be formatted YYYY-MM-DD', 400);
+    }
+    if (body.timeStart && body.timeEnd && body.timeEnd <= body.timeStart) {
+      return errorResponse('timeEnd must be after timeStart', 400);
     }
 
     const existing = await getReservationById(auth.supabase, reservationId);
@@ -70,12 +75,64 @@ export async function PUT(
       return errorResponse('Reservation not found', 404);
     }
 
+    const status = existing.status;
+    const slotFields =
+      body.date !== undefined || body.timeStart !== undefined || body.timeEnd !== undefined;
+    const otherFields =
+      body.guests !== undefined ||
+      body.roomType !== undefined ||
+      body.activitySlot !== undefined ||
+      body.note !== undefined ||
+      body.paymentMethod !== undefined;
+    const edits = slotFields || otherFields;
+
+    // 1) Créneau proposé par l'établissement : le client confirme ou annule, rien d'autre.
+    if (status === 'proposed') {
+      if (edits || (body.status !== 'confirmed' && body.status !== 'cancelled')) {
+        return errorResponse('Un créneau proposé ne peut être que confirmé ou annulé', 400);
+      }
+    } else if (body.status === 'confirmed') {
+      return errorResponse('Seul un créneau proposé peut être confirmé', 400);
+    }
+
+    // 2) Réservation indisponible : le client reprogramme (nouveau créneau) ou annule.
+    if (status === 'unavailable') {
+      if (body.status !== undefined && body.status !== 'cancelled') {
+        return errorResponse('Une réservation indisponible peut être reprogrammée ou annulée', 400);
+      }
+      if (otherFields) {
+        return errorResponse('Seuls la date et les horaires peuvent être modifiés', 400);
+      }
+    }
+
+    // 3) Modification : uniquement tant que la réservation est en attente
+    //    (ou reprogrammation d'une réservation indisponible). Le lieu n'est jamais modifiable.
+    if (edits) {
+      if (status !== 'pending' && status !== 'unavailable') {
+        return errorResponse('Une réservation ne peut être modifiée que lorsqu\u2019elle est en attente', 400);
+      }
+      if (body.status === 'cancelled') {
+        return errorResponse('Choisissez soit une modification, soit l\u2019annulation', 400);
+      }
+      if (body.roomType !== undefined && existing.reservation_type !== 'hotel') {
+        return errorResponse('roomType n\u2019est valable que pour une réservation d\u2019hôtel', 400);
+      }
+      if (body.activitySlot !== undefined && existing.reservation_type !== 'activity') {
+        return errorResponse('activitySlot n\u2019est valable que pour une réservation d\u2019activité', 400);
+      }
+    }
+
+    // Un nouveau créneau remet une réservation indisponible en attente.
+    const nextStatus = status === 'unavailable' && slotFields ? 'pending' : body.status;
     // paymentStatus / price ne sont jamais acceptés du client
     const updated = await updateReservation(auth.supabase, reservationId, {
-      status: body.status,
+      status: nextStatus,
       paymentMethod: body.paymentMethod,
       note: body.note,
       guests: body.guests,
+      roomType: body.roomType,
+      activitySlot: body.activitySlot,
+      date: body.date,
       timeStart: body.timeStart,
       timeEnd: body.timeEnd,
     });

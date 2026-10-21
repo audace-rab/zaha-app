@@ -1,5 +1,5 @@
 import { GoogleGenAI, Type } from '@google/genai';
-import type { Coordinates, Place } from '@zaha/shared';
+import type { Coordinates, Place, PlaceStatus } from '@zaha/shared';
 import { cacheGet, cacheSet, CACHE_KEYS } from '@/lib/cache/cacheService';
 import { createAdminClient } from '@/lib/supabase/server';
 
@@ -204,6 +204,10 @@ async function resolveCityIds(cityName?: string): Promise<string[]> {
   }
 }
 
+function toPlaceStatus(value: unknown): PlaceStatus {
+  return value === 'vip' ? 'vip' : 'normal';
+}
+
 function mapRowToPlace(row: Record<string, unknown>): Place {
   const latitude = row.latitude;
   const longitude = row.longitude;
@@ -216,8 +220,9 @@ function mapRowToPlace(row: Record<string, unknown>): Place {
     rating: row.rating != null ? Number(row.rating) : undefined,
     openingHours: row.opening_hours != null ? String(row.opening_hours) : undefined,
     photoUrl: row.photo_url != null ? String(row.photo_url) : undefined,
+    photos: Array.isArray(row.photos) ? (row.photos as unknown[]).map(String) : undefined,
     googleMapsUri: row.google_maps_uri != null ? String(row.google_maps_uri) : undefined,
-    isPro: Boolean(row.is_pro),
+    status: toPlaceStatus(row.status),
     location:
       latitude != null && longitude != null
         ? { latitude: Number(latitude), longitude: Number(longitude) }
@@ -345,7 +350,6 @@ async function persistPlaces(
       longitude: p.location?.longitude ?? null,
       google_maps_uri: p.googleMapsUri ?? null,
       photo_url: p.photoUrl ?? null,
-      is_pro: Boolean(p.isPro),
     }));
     const { error } = await supabase
       .from('places')
@@ -367,19 +371,20 @@ export interface PlaceMapPoint {
   latitude: number;
   longitude: number;
   photoUrl?: string;
-  isPro: boolean;
+  photos?: string[];
+  status: PlaceStatus;
   address?: string;
 }
 
 export async function listAllPlaces(): Promise<PlaceMapPoint[]> {
-  const cacheKey = 'zaha_places_all_v1';
+  const cacheKey = 'zaha_places_all_v3';
   const cached = await cacheGet<PlaceMapPoint[]>(cacheKey);
   if (cached?.length) return cached;
 
   const supabase = createAdminClient();
   const { data, error } = await supabase
     .from('places')
-    .select('id, name, category, address, latitude, longitude, photo_url, is_pro')
+    .select('id, name, category, address, latitude, longitude, photo_url, photos, status')
     .not('latitude', 'is', null)
     .not('longitude', 'is', null)
     .order('name');
@@ -396,7 +401,8 @@ export async function listAllPlaces(): Promise<PlaceMapPoint[]> {
     latitude: Number(row.latitude),
     longitude: Number(row.longitude),
     photoUrl: row.photo_url != null ? String(row.photo_url) : undefined,
-    isPro: Boolean(row.is_pro),
+    photos: Array.isArray(row.photos) ? (row.photos as unknown[]).map(String) : undefined,
+    status: toPlaceStatus(row.status),
     address: row.address != null ? String(row.address) : undefined,
   }));
 

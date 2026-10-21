@@ -28,7 +28,7 @@ type SelectedPlace = {
   googleMapsUri?: string;
   photoUrl?: string;
   openingHours?: string;
-  isPro?: boolean;
+  status?: 'normal' | 'vip';
   location?: { latitude: number; longitude: number };
 };
 

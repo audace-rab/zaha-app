@@ -1,4 +1,4 @@
-import type { FeedItem, FeedPage } from '@zaha/shared';
+import type { FeedItem, FeedPage, PlaceStatus } from '@zaha/shared';
 import { createAdminClient } from '@/lib/supabase/server';
 
 export interface FeedFilters {
@@ -30,6 +30,13 @@ export async function getFeed(filters?: FeedFilters): Promise<FeedPage> {
           name,
           avatar_url,
           country_flag
+        ),
+        place:places!posts_place_id_fkey (
+          id,
+          name,
+          category,
+          address,
+          status
         ),
         post_media ( type, url, sort_order )
       `)
@@ -87,6 +94,8 @@ export async function getFeed(filters?: FeedFilters): Promise<FeedPage> {
         .sort((a, b) => a.sort_order - b.sort_order)
         .map((m) => ({ type: m.type as 'image' | 'video', url: m.url }));
 
+      const place = Array.isArray(post.place) ? post.place[0] : post.place;
+
       const item: FeedItem = {
         id: post.id,
         authorId: author?.id ?? '',
@@ -100,6 +109,15 @@ export async function getFeed(filters?: FeedFilters): Promise<FeedPage> {
         commentsCount: commentsCount.get(post.id) ?? 0,
         isBusiness: post.is_business,
         location: post.location ?? '',
+        place: place
+          ? {
+              id: place.id,
+              name: place.name,
+              category: place.category ?? undefined,
+              address: place.address ?? undefined,
+              status: (place.status === 'vip' ? 'vip' : 'normal') as PlaceStatus,
+            }
+          : undefined,
         timestamp: new Date(post.created_at).toISOString(),
       };
 

@@ -31,7 +31,7 @@ type Place = {
   googleMapsUri?: string;
   photoUrl?: string;
   openingHours?: string;
-  isPro?: boolean;
+  status?: 'normal' | 'vip';
   distance_km?: number;
   location?: { latitude: number; longitude: number };
 };
@@ -424,7 +424,7 @@ export default function PlacesScreen({ onSelectPlace }: PlacesScreenProps) {
             )}
             <View style={styles.cardBody}>
               <View style={styles.cardTitleRow}>
-                {item.isPro && <Text style={styles.proBadge}>PRO</Text>}
+                {item.status === 'vip' && <Text style={styles.vipBadge}>VIP</Text>}
                 <Text style={styles.name}>{item.name}</Text>
               </View>
               <View style={styles.addressRow}>
@@ -573,11 +573,13 @@ const styles = StyleSheet.create({
   thumbnailPlaceholder: { alignItems: 'center', justifyContent: 'center' },
   cardBody: { flex: 1 },
   cardTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 },
-  proBadge: {
-    backgroundColor: colors.primary,
-    color: colors.surface,
+  vipBadge: {
+    backgroundColor: colors.vipBg,
+    color: colors.vip,
+    borderWidth: 1,
+    borderColor: colors.vipBorder,
     fontSize: 10,
-    fontWeight: '700',
+    fontWeight: '800',
     paddingHorizontal: 5,
     paddingVertical: 1,
     borderRadius: 4,

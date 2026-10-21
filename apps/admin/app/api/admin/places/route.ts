@@ -4,6 +4,8 @@ import type { Database } from '@/lib/supabase/database.types';
 
 type PlaceInsert = Database['public']['Tables']['places']['Insert'];
 
+const PLACE_STATUSES = ['normal', 'vip'];
+
 /** Liste paginée des lieux avec recherche (?q=) et filtre catégorie (?category=). */
 export async function GET(request: Request) {
   const admin = await requireAdmin();
@@ -53,6 +55,13 @@ export async function POST(request: Request) {
     if (!body.name?.trim() || !body.category?.trim()) {
       return errorResponse('name and category are required', 400);
     }
+    if (body.status !== undefined && !PLACE_STATUSES.includes(body.status)) {
+      return errorResponse(`status must be one of: ${PLACE_STATUSES.join(', ')}`, 400);
+    }
+    if (body.photos !== undefined && !(Array.isArray(body.photos) && body.photos.every((u) => typeof u === 'string'))) {
+      return errorResponse('photos must be an array of URLs', 400);
+    }
+    const photos = (body.photos ?? []).map((u) => u.trim()).filter(Boolean);
 
     const payload: PlaceInsert = {
       name: body.name.trim(),
@@ -65,8 +74,10 @@ export async function POST(request: Request) {
       latitude: body.latitude ?? null,
       longitude: body.longitude ?? null,
       google_maps_uri: body.google_maps_uri ?? null,
-      photo_url: body.photo_url ?? null,
-      is_pro: body.is_pro ?? false,
+      // La première photo du carrousel sert de couverture.
+      photo_url: photos[0] ?? body.photo_url ?? null,
+      photos,
+      status: body.status ?? 'normal',
       city_id: body.city_id ?? null,
       external_id: body.external_id ?? null,
     };

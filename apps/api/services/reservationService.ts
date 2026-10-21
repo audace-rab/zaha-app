@@ -167,6 +167,9 @@ export async function updateReservation(
     paymentMethod: string;
     note: string;
     guests: number;
+    roomType: string;
+    activitySlot: string;
+    date: string;
     timeStart: string;
     timeEnd: string;
   }>
@@ -176,6 +179,9 @@ export async function updateReservation(
     payment_method?: string;
     note?: string;
     guests?: number;
+    room_type?: string;
+    activity_slot?: string;
+    date?: string;
     time_start?: string;
     time_end?: string;
     updated_at: string;
@@ -186,6 +192,9 @@ export async function updateReservation(
   if (patch.paymentMethod !== undefined) updateData.payment_method = patch.paymentMethod;
   if (patch.note !== undefined) updateData.note = patch.note;
   if (patch.guests !== undefined) updateData.guests = patch.guests;
+  if (patch.roomType !== undefined) updateData.room_type = patch.roomType;
+  if (patch.activitySlot !== undefined) updateData.activity_slot = patch.activitySlot;
+  if (patch.date !== undefined) updateData.date = patch.date;
   if (patch.timeStart !== undefined) updateData.time_start = patch.timeStart;
   if (patch.timeEnd !== undefined) updateData.time_end = patch.timeEnd;
 

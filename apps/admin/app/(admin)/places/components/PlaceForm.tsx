@@ -30,9 +30,17 @@ export default function PlaceForm({ initialPlace = null }: PlaceFormProps) {
     latitude: initialPlace?.latitude?.toString() ?? '',
     longitude: initialPlace?.longitude?.toString() ?? '',
     google_maps_uri: initialPlace?.google_maps_uri ?? '',
-    photo_url: initialPlace?.photo_url ?? '',
-    is_pro: initialPlace?.is_pro ?? false,
+    status: initialPlace?.status ?? 'normal',
   });
+
+  // Carrousel : l'ordre du tableau = ordre d'affichage, la 1re photo = couverture.
+  const [photos, setPhotos] = useState<string[]>(() => {
+    const list = initialPlace?.photos ?? [];
+    if (list.length > 0) return list;
+    return initialPlace?.photo_url ? [initialPlace.photo_url] : [];
+  });
+  const [photoUrlDraft, setPhotoUrlDraft] = useState('');
+  const [uploading, setUploading] = useState(false);
 
   useEffect(() => {
     fetch('/api/admin/places/categories')
@@ -43,6 +51,51 @@ export default function PlaceForm({ initialPlace = null }: PlaceFormProps) {
 
   function set(field: keyof typeof form, value: string | boolean) {
     setForm((f) => ({ ...f, [field]: value }));
+  }
+
+  async function handleFiles(files: FileList | null) {
+    if (!files || files.length === 0) return;
+    setUploading(true);
+    setError(null);
+    const added: string[] = [];
+    for (const file of Array.from(files)) {
+      try {
+        const body = new FormData();
+        body.append('file', file);
+        const res = await fetch('/api/admin/places/photos', { method: 'POST', body });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          setError(`${file.name} : ${data.error ?? 'échec de l’envoi'}`);
+          continue;
+        }
+        added.push(data.url as string);
+      } catch {
+        setError(`${file.name} : échec de l’envoi`);
+      }
+    }
+    if (added.length > 0) setPhotos((prev) => [...prev, ...added]);
+    setUploading(false);
+  }
+
+  function addPhotoUrl() {
+    const url = photoUrlDraft.trim();
+    if (!url) return;
+    setPhotos((prev) => [...prev, url]);
+    setPhotoUrlDraft('');
+  }
+
+  function movePhoto(index: number, direction: -1 | 1) {
+    setPhotos((prev) => {
+      const target = index + direction;
+      if (target < 0 || target >= prev.length) return prev;
+      const next = [...prev];
+      [next[index], next[target]] = [next[target], next[index]];
+      return next;
+    });
+  }
+
+  function removePhoto(index: number) {
+    setPhotos((prev) => prev.filter((_, i) => i !== index));
   }
 
   function parseNumber(value: string): number | null {
@@ -66,8 +119,8 @@ export default function PlaceForm({ initialPlace = null }: PlaceFormProps) {
       latitude: parseNumber(form.latitude),
       longitude: parseNumber(form.longitude),
       google_maps_uri: form.google_maps_uri || null,
-      photo_url: form.photo_url || null,
-      is_pro: form.is_pro,
+      photos,
+      status: form.status,
     };
 
     try {
@@ -166,8 +219,16 @@ export default function PlaceForm({ initialPlace = null }: PlaceFormProps) {
         </div>
 
         <div className="space-y-2">
-          <label className={labelClass} htmlFor="photo_url">URL photo</label>
-          <input id="photo_url" type="url" value={form.photo_url} onChange={(e) => set('photo_url', e.target.value)} className={inputClass} />
+          <label className={labelClass} htmlFor="status">Statut du lieu</label>
+          <select
+            id="status"
+            value={form.status}
+            onChange={(e) => set('status', e.target.value)}
+            className={inputClass}
+          >
+            <option value="normal">Normal</option>
+            <option value="vip">VIP (badge + bouton de réservation sur les posts)</option>
+          </select>
         </div>
 
         <div className="space-y-2 sm:col-span-2">
@@ -175,21 +236,114 @@ export default function PlaceForm({ initialPlace = null }: PlaceFormProps) {
           <input id="google_maps_uri" type="url" value={form.google_maps_uri} onChange={(e) => set('google_maps_uri', e.target.value)} className={inputClass} />
         </div>
 
-        <label className="flex items-center gap-2 text-sm text-slate-700 sm:col-span-2">
-          <input
-            type="checkbox"
-            checked={form.is_pro}
-            onChange={(e) => set('is_pro', e.target.checked)}
-            className="h-4 w-4 rounded border-slate-300"
-          />
-          Lieu « Pro » (partenaire professionnel)
-        </label>
+        <div className="space-y-3 sm:col-span-2">
+          <div className="flex items-center justify-between">
+            <label className={labelClass}>
+              Photos ({photos.length}) — la première est la photo de couverture
+            </label>
+            <label
+              className={`cursor-pointer rounded-lg border border-slate-300 px-3 py-1.5 text-sm text-slate-700 transition hover:bg-slate-100 ${
+                uploading ? 'pointer-events-none opacity-50' : ''
+              }`}
+            >
+              {uploading ? 'Envoi en cours…' : 'Ajouter des photos'}
+              <input
+                type="file"
+                accept="image/jpeg,image/png,image/gif,image/webp"
+                multiple
+                className="hidden"
+                disabled={uploading}
+                onChange={(e) => {
+                  handleFiles(e.target.files);
+                  e.target.value = '';
+                }}
+              />
+            </label>
+          </div>
+
+          {photos.length === 0 ? (
+            <p className="rounded-lg border border-dashed border-slate-300 px-4 py-6 text-center text-sm text-slate-500">
+              Aucune photo. Ajoutez des fichiers (JPEG, PNG, GIF, WebP — 4 Mo max) ou collez une URL.
+            </p>
+          ) : (
+            <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+              {photos.map((url, index) => (
+                <li
+                  key={`${url}-${index}`}
+                  className="overflow-hidden rounded-lg border border-slate-200 bg-slate-50"
+                >
+                  <div className="relative">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={url} alt="" className="h-28 w-full object-cover" />
+                    {index === 0 && (
+                      <span className="absolute left-2 top-2 rounded-full bg-slate-900 px-2 py-0.5 text-xs font-medium text-white">
+                        Couverture
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex items-center justify-between gap-1 p-2 text-xs">
+                    <div className="flex gap-1">
+                      <button
+                        type="button"
+                        onClick={() => movePhoto(index, -1)}
+                        disabled={index === 0}
+                        aria-label="Déplacer vers la gauche"
+                        className="rounded border border-slate-300 px-2 py-1 disabled:opacity-30"
+                      >
+                        ◀
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => movePhoto(index, 1)}
+                        disabled={index === photos.length - 1}
+                        aria-label="Déplacer vers la droite"
+                        className="rounded border border-slate-300 px-2 py-1 disabled:opacity-30"
+                      >
+                        ▶
+                      </button>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => removePhoto(index)}
+                      className="font-medium text-red-600 hover:underline"
+                    >
+                      Retirer
+                    </button>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+
+          <div className="flex gap-2">
+            <input
+              type="url"
+              value={photoUrlDraft}
+              onChange={(e) => setPhotoUrlDraft(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  addPhotoUrl();
+                }
+              }}
+              placeholder="https://… (ajouter une photo par URL)"
+              className={inputClass}
+            />
+            <button
+              type="button"
+              onClick={addPhotoUrl}
+              className="shrink-0 rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-700 transition hover:bg-slate-100"
+            >
+              Ajouter
+            </button>
+          </div>
+        </div>
       </div>
 
       <div className="flex gap-3">
         <button
           type="submit"
-          disabled={saving}
+          disabled={saving || uploading}
           className="rounded-lg bg-slate-900 px-5 py-2 text-sm font-medium text-white transition hover:bg-slate-700 disabled:opacity-50"
         >
           {saving ? 'Enregistrement…' : isEdit ? 'Enregistrer' : 'Créer le lieu'}

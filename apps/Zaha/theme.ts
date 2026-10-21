@@ -26,6 +26,13 @@ export const colors = {
   like: '#ef4444',
   likeSoft: '#fef2f2',
   rating: '#ca8a04',
+  vip: '#b45309',
+  vipBg: '#fef3c7',
+  vipBorder: '#fcd34d',
+  unavailable: '#c2410c',
+  unavailableBg: '#ffedd5',
+  proposed: '#6d28d9',
+  proposedBg: '#ede9fe',
 };
 
 export const radius = {

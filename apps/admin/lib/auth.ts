@@ -1,3 +1,4 @@
+import { cache } from 'react';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { createAdminClient } from '@/lib/supabase/server';
 import { createSessionClient } from '@/lib/supabase/session';
@@ -17,8 +18,11 @@ export interface AdminContext {
  * Usage :
  *   const admin = await requireAdmin();
  *   if (!admin) return errorResponse('Forbidden', 403);
+ *
+ * Mémoïsé par requête (React cache) : le layout et la page partagent le même
+ * résultat au lieu de refaire 2 appels réseau Supabase chacun.
  */
-export async function requireAdmin(): Promise<AdminContext | null> {
+export const requireAdmin = cache(async (): Promise<AdminContext | null> => {
   try {
     const sessionClient = await createSessionClient();
     const { data, error } = await sessionClient.auth.getUser();
@@ -37,7 +41,7 @@ export async function requireAdmin(): Promise<AdminContext | null> {
   } catch {
     return null;
   }
-}
+});
 
 /** Vérifie l'appartenance admin pour un userId donné (usage layout/login). */
 export async function isAdmin(userId: string): Promise<boolean> {

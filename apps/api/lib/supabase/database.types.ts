@@ -1,4 +1,4 @@
-﻿export type Json =
+export type Json =
   | string
   | number
   | boolean
@@ -143,7 +143,8 @@ export interface Database {
           longitude: number | null;
           google_maps_uri: string | null;
           photo_url: string | null;
-          is_pro: boolean;
+          photos: string[];
+          status: string;
           city_id: string | null;
           created_at: string;
         };
@@ -161,7 +162,8 @@ export interface Database {
           longitude?: number | null;
           google_maps_uri?: string | null;
           photo_url?: string | null;
-          is_pro?: boolean;
+          photos?: string[];
+          status?: string;
           city_id?: string | null;
           created_at?: string;
         };
@@ -179,7 +181,8 @@ export interface Database {
           longitude?: number | null;
           google_maps_uri?: string | null;
           photo_url?: string | null;
-          is_pro?: boolean;
+          photos?: string[];
+          status?: string;
           city_id?: string | null;
           created_at?: string;
         };
@@ -200,6 +203,7 @@ export interface Database {
           content: string;
           location: string | null;
           is_business: boolean;
+          place_id: string | null;
           created_at: string;
         };
         Insert: {
@@ -208,6 +212,7 @@ export interface Database {
           content: string;
           location?: string | null;
           is_business?: boolean;
+          place_id?: string | null;
           created_at?: string;
         };
         Update: {
@@ -216,6 +221,7 @@ export interface Database {
           content?: string;
           location?: string | null;
           is_business?: boolean;
+          place_id?: string | null;
           created_at?: string;
         };
         Relationships: [
@@ -224,6 +230,13 @@ export interface Database {
             columns: ['author_id'];
             isOneToOne: false;
             referencedRelation: 'profiles';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'posts_place_id_fkey';
+            columns: ['place_id'];
+            isOneToOne: false;
+            referencedRelation: 'places';
             referencedColumns: ['id'];
           }
         ];

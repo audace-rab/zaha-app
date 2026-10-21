@@ -33,21 +33,25 @@ export async function proxy(request: NextRequest) {
     },
   });
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
   const { pathname } = request.nextUrl;
   const isLoginPage = pathname === '/login';
 
-  if (!user && !isLoginPage) {
+  // Page de login : getUser() (appel réseau) pour ne jamais rediriger sur une
+  // session invalide (évite une boucle /login <-> /).
+  // Autres pages : lecture du cookie (sans appel réseau, rafraîchit le token si
+  // expiré). Simple garde optimiste : requireAdmin() revérifie côté serveur.
+  const loggedIn = isLoginPage
+    ? !!(await supabase.auth.getUser()).data.user
+    : !!(await supabase.auth.getSession()).data.session;
+
+  if (!loggedIn && !isLoginPage) {
     const redirectUrl = request.nextUrl.clone();
     redirectUrl.pathname = '/login';
     redirectUrl.searchParams.set('next', pathname);
     return NextResponse.redirect(redirectUrl);
   }
 
-  if (user && isLoginPage) {
+  if (loggedIn && isLoginPage) {
     const redirectUrl = request.nextUrl.clone();
     redirectUrl.pathname = '/';
     redirectUrl.search = '';

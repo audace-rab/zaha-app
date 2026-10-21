@@ -37,6 +37,14 @@ alter table public.profiles add column if not exists bio text;
 alter table public.profiles add column if not exists website text;
 
 -- ----------------------------------------------------------------------------
+-- 2.1b Administrateurs du back-office
+-- ----------------------------------------------------------------------------
+create table if not exists public.admin_users (
+  user_id uuid primary key references auth.users(id) on delete cascade,
+  created_at timestamptz not null default now()
+);
+
+-- ----------------------------------------------------------------------------
 -- 2.2 Villes (référentiel géographique — PAS des lieux)
 --     État final après les migrations 2 et 3 : le nom vit dans city_names.
 -- ----------------------------------------------------------------------------
@@ -83,7 +91,10 @@ create table if not exists public.places (
   longitude double precision,
   google_maps_uri text,
   photo_url text,
-  is_pro boolean not null default false,
+  -- Photos (carrousel) : l'ordre = ordre d'affichage, la 1re = couverture (photo_url)
+  photos text[] not null default '{}',
+  -- Statut du lieu : 'normal' ou 'vip' (badge VIP + bouton réservation sur les posts)
+  status text not null default 'normal' check (status in ('normal', 'vip')),
   city_id uuid references public.cities(id) on delete set null,
   created_at timestamptz not null default now()
 );
@@ -99,6 +110,8 @@ create table if not exists public.posts (
   content text not null,
   location text default '',
   is_business boolean not null default false,
+  -- Lieu rattaché (optionnel) : un lieu VIP ajoute badge + bouton réservation
+  place_id uuid references public.places(id) on delete set null,
   created_at timestamptz not null default now()
 );
 
@@ -183,7 +196,8 @@ create table if not exists public.reservations (
   activity_slot text,
   price decimal(10,2) default 0,
   currency text default 'MGA',
-  status text default 'pending',
+  status text default 'pending'
+    check (status in ('pending', 'confirmed', 'cancelled', 'completed', 'unavailable', 'proposed')),
   payment_method text,
   payment_status text default 'unpaid',
   note text,
@@ -206,6 +220,7 @@ create index if not exists places_city_idx on public.places (city_id);
 
 create index if not exists posts_author_idx on public.posts (author_id);
 create index if not exists posts_created_idx on public.posts (created_at desc);
+create index if not exists posts_place_idx on public.posts (place_id);
 create index if not exists post_media_post_idx on public.post_media (post_id);
 create index if not exists comments_post_idx on public.comments (post_id);
 
@@ -251,6 +266,7 @@ create trigger on_auth_user_created
 -- 5. ROW LEVEL SECURITY + POLICIES (lecture publique comme les migrations)
 -- ============================================================================
 alter table public.profiles enable row level security;
+alter table public.admin_users enable row level security;
 alter table public.cities enable row level security;
 alter table public.city_names enable row level security;
 alter table public.places enable row level security;
@@ -272,6 +288,10 @@ create policy "Profiles are viewable by everyone"
 drop policy if exists "Users can update own profile" on public.profiles;
 create policy "Users can update own profile"
   on public.profiles for update using (auth.uid() = id);
+
+drop policy if exists "admin_users_select_own" on public.admin_users;
+create policy "admin_users_select_own"
+  on public.admin_users for select using (auth.uid() = user_id);
 
 -- Villes et noms de villes : publics en lecture
 drop policy if exists "cities_are_public" on public.cities;
@@ -452,6 +472,17 @@ create policy "Users delete own avatar"
   on storage.objects for delete
   using (bucket_id = 'avatars' and auth.uid()::text = (storage.foldername(name))[1]);
 
+-- Bucket public pour les photos de lieux (écriture : back-office uniquement,
+-- via la clé service_role qui contourne la RLS)
+insert into storage.buckets (id, name, public)
+values ('place-photos', 'place-photos', true)
+on conflict (id) do update set public = true;
+
+drop policy if exists "Public read place photos" on storage.objects;
+create policy "Public read place photos"
+  on storage.objects for select
+  using (bucket_id = 'place-photos');
+
 -- Bucket public pour les photos de posts (upload avant création du post)
 insert into storage.buckets (id, name, public)
 values ('post-photos', 'post-photos', true)
@@ -550,7 +581,7 @@ where external_id in ('restaurant-le-comptoir-du-relais', 'hotel-hotel-du-louvre
 
 insert into public.places (
   external_id, name, category, place_type, address, snippet, opening_hours,
-  rating, latitude, longitude, google_maps_uri, photo_url, is_pro, city_id
+  rating, latitude, longitude, google_maps_uri, photo_url, photos, status, city_id
 )
 values
   (
@@ -560,7 +591,7 @@ values
     '12:00 - 22:00', 4.8, -18.9119145, 47.5249725, 
     'https://maps.google.com/?q=La+Varangue+Antananarivo',
     'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=800&q=80',
-    true, 'c1000000-0000-0000-0000-000000000001'
+    '{}', 'vip', 'c1000000-0000-0000-0000-000000000001'
   ),
   (
     'hotel-carlton-madagascar', 'Hôtel Carlton Madagascar', 'hotel', 'hotel',
@@ -569,7 +600,7 @@ values
     'Ouvert 24h/24', 4.7, -18.9147088, 47.5178248,
     'https://maps.google.com/?q=Carlton+Hotel+Antananarivo',
     'https://images.unsplash.com/photo-1566073771259-6a8506099945?w=800&q=80',
-    true, 'c1000000-0000-0000-0000-000000000001'
+    '{}', 'vip', 'c1000000-0000-0000-0000-000000000001'
   ),
   -- --- Depuis FALLBACK_PLACES legacy : restaurants ---
   (
@@ -579,7 +610,7 @@ values
     '11:30 - 23:00', 4.7, -18.8873638, 47.5234756,
     'https://maps.google.com/?q=Le+Marais+Antananarivo',
     'https://images.unsplash.com/photo-1552566626-52f8b828add9?w=800&q=80',
-    true, 'c1000000-0000-0000-0000-000000000001'
+    '{}', 'vip', 'c1000000-0000-0000-0000-000000000001'
   ),
   (
     'restaurant-cafe-de-la-gare', 'Café de la Gare', 'restaurant', 'restaurant',
@@ -588,7 +619,7 @@ values
     '07:00 - 22:30', 4.6, -18.9035370, 47.5208116, 
     'https://maps.google.com/?q=Cafe+de+la+Gare+Antananarivo',
     'https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=800&q=80',
-    false, 'c1000000-0000-0000-0000-000000000001'
+    '{}', 'normal', 'c1000000-0000-0000-0000-000000000001'
   ),
   (
     'restaurant-sakamanga', 'Sakamanga Restaurant', 'restaurant', 'restaurant',
@@ -597,7 +628,7 @@ values
     '06:30 - 22:00', 4.5, -18.9082451, 47.5213083,
     'https://maps.google.com/?q=Sakamanga+Antananarivo',
     'https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=800&q=80',
-    true, 'c1000000-0000-0000-0000-000000000001'
+    '{}', 'vip', 'c1000000-0000-0000-0000-000000000001'
   ),
   -- --- Depuis FALLBACK_PLACES legacy : hôtels ---
   (
@@ -607,7 +638,7 @@ values
     'Ouvert 24h/24', 4.8, -18.8902914, 47.5245160, 
     'https://maps.google.com/?q=Radisson+Blu+Antananarivo',
     'https://images.unsplash.com/photo-1582719508461-905c673771fd?w=800&q=80',
-    true, 'c1000000-0000-0000-0000-000000000001'
+    '{}', 'vip', 'c1000000-0000-0000-0000-000000000001'
   ),
   (
     'hotel-sakamanga', 'Hôtel Sakamanga', 'hotel', 'hotel',
@@ -616,7 +647,7 @@ values
     'Ouvert 24h/24', 4.6, -18.9082451, 47.5213083, 
     'https://maps.google.com/?q=Hotel+Sakamanga+Antananarivo',
     'https://images.unsplash.com/photo-1520250497591-112f2f40a3f4?w=800&q=80',
-    false, 'c1000000-0000-0000-0000-000000000001'
+    '{}', 'normal', 'c1000000-0000-0000-0000-000000000001'
   )
 on conflict (external_id) do update set
   name = excluded.name,
@@ -630,7 +661,7 @@ on conflict (external_id) do update set
   longitude = excluded.longitude,
   google_maps_uri = excluded.google_maps_uri,
   photo_url = excluded.photo_url,
-  is_pro = excluded.is_pro,
+  status = excluded.status,
   city_id = excluded.city_id;
 
 -- ============================================================================

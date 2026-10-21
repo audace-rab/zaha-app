@@ -27,11 +27,14 @@ type ReservationType = 'table' | 'hotel' | 'activity' | 'general';
 
 type ReservationScreenProps = {
   place: PlaceMini;
+  /** Appelé à la fermeture de l'écran (annulation OU réservation envoyée). */
   onDone: () => void;
+  /** Appelé uniquement quand la réservation a bien été créée (avant onDone). */
+  onCreated?: () => void;
 };
 
-const ROOM_TYPES = ['Simple', 'Double', 'Suite', 'Familiale'];
-const ACTIVITY_SLOTS = ['Matin', 'Après-midi', 'Journée complète'];
+export const ROOM_TYPES = ['Simple', 'Double', 'Suite', 'Familiale'];
+export const ACTIVITY_SLOTS = ['Matin', 'Après-midi', 'Journée complète'];
 
 const TYPE_INFO: Record<ReservationType, { label: string; icon: FontIconName }> = {
   table: { label: 'Réservation de table', icon: 'utensils' },
@@ -56,7 +59,7 @@ const formatTime = (d: Date) =>
 
 const today = new Date();
 
-export default function ReservationScreen({ place, onDone }: ReservationScreenProps) {
+export default function ReservationScreen({ place, onDone, onCreated }: ReservationScreenProps) {
   const currentUserId = useAuthUser();
   const reservationType = deriveType(place.category);
 
@@ -115,6 +118,7 @@ export default function ReservationScreen({ place, onDone }: ReservationScreenPr
         activitySlot: reservationType === 'activity' ? activitySlot || undefined : undefined,
         note: note.trim() || undefined,
       });
+      onCreated?.();
       onDone();
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Erreur lors de la réservation.');

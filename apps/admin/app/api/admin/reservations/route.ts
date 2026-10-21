@@ -1,7 +1,7 @@
 import { requireAdmin } from '@/lib/auth';
 import { jsonResponse, errorResponse, getPagination } from '@/lib/api';
 
-const RESERVATION_STATUSES = ['pending', 'confirmed', 'cancelled', 'completed'];
+const RESERVATION_STATUSES = ['pending', 'confirmed', 'cancelled', 'completed', 'unavailable', 'proposed'];
 
 /** Liste paginée des réservations avec filtres (?status=&paymentStatus=&from=&to=). */
 export async function GET(request: Request) {

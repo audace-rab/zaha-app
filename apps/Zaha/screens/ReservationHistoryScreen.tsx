@@ -15,6 +15,7 @@ import { api, type Reservation } from '../lib/api';
 import { useAuthUser } from '../lib/useAuthUser';
 import { formatDateDisplay } from '../lib/format';
 import FontIcon from '../components/FontIcon';
+import ReservationEditModal from '../components/ReservationEditModal';
 import { colors, radius } from '../theme';
 
 type StatusFilter = 'all' | Reservation['status'];
@@ -24,11 +25,15 @@ const STATUS_CONFIG: Record<Reservation['status'], { color: string; bg: string; 
   confirmed: { color: colors.success, bg: colors.successBg, label: 'Confirmée' },
   cancelled: { color: colors.danger, bg: colors.dangerBg, label: 'Annulée' },
   completed: { color: colors.primary, bg: colors.info, label: 'Terminée' },
+  unavailable: { color: colors.unavailable, bg: colors.unavailableBg, label: 'Indisponible' },
+  proposed: { color: colors.proposed, bg: colors.proposedBg, label: 'À confirmer' },
 };
 
 const STATUS_FILTERS: { key: StatusFilter; label: string }[] = [
   { key: 'all', label: 'Toutes' },
   { key: 'pending', label: 'En attente' },
+  { key: 'proposed', label: 'À confirmer' },
+  { key: 'unavailable', label: 'Indisponibles' },
   { key: 'confirmed', label: 'Confirmées' },
   { key: 'completed', label: 'Terminées' },
   { key: 'cancelled', label: 'Annulées' },
@@ -46,6 +51,10 @@ export default function ReservationHistoryScreen({ onBack }: ReservationHistoryS
   const [filter, setFilter] = useState<StatusFilter>('all');
   const currentUserId = useAuthUser();
   const [cancellingId, setCancellingId] = useState<string | null>(null);
+  const [confirmingId, setConfirmingId] = useState<string | null>(null);
+  // Réservation en cours de modification (modale ouverte) :
+  // 'edit' = en attente (tout sauf le lieu), 'reschedule' = indisponible (nouveau créneau).
+  const [editing, setEditing] = useState<{ reservation: Reservation; mode: 'edit' | 'reschedule' } | null>(null);
 
   // Intercepter le bouton retour Android pour revenir à Profil
   useEffect(() => {
@@ -99,6 +108,32 @@ export default function ReservationHistoryScreen({ onBack }: ReservationHistoryS
         },
       ]
     );
+  };
+
+  // Modification enregistrée. Une reprogrammation repasse la réservation « en attente » :
+  // elle quitte alors le filtre « Indisponibles ».
+  const handleSaved = (updated: Reservation) => {
+    setReservations((prev) =>
+      filter !== 'all' && filter !== updated.status
+        ? prev.filter((r) => r.id !== updated.id)
+        : prev.map((r) => (r.id === updated.id ? { ...r, ...updated } : r))
+    );
+    setEditing(null);
+  };
+
+  // Le client accepte le créneau proposé par l'établissement.
+  const handleConfirm = async (id: string) => {
+    setConfirmingId(id);
+    setError(null);
+    try {
+      const { reservation: updated } = await api.confirmReservation(id);
+      handleSaved({ ...updated, status: 'confirmed' });
+    } catch (e) {
+      console.warn('Erreur confirmation :', e);
+      setError(e instanceof Error ? e.message : 'Impossible de confirmer le créneau. Réessayez.');
+    } finally {
+      setConfirmingId(null);
+    }
   };
 
   const confirmCancel = async (id: string) => {
@@ -221,24 +256,82 @@ export default function ReservationHistoryScreen({ onBack }: ReservationHistoryS
                   <Text style={styles.cardNote}>{item.note}</Text>
                 </View>
               ) : null}
-              {item.status === 'pending' && (
-                <TouchableOpacity
-                  style={styles.cancelBtn}
-                  onPress={() => handleCancel(item.id)}
-                  disabled={cancellingId === item.id}
-                  accessibilityRole="button"
-                  accessibilityLabel="Annuler cette réservation"
-                >
-                  {cancellingId === item.id ? (
-                    <ActivityIndicator size="small" color="#dc2626" />
-                  ) : (
-                    <Text style={styles.cancelBtnText}>Annuler</Text>
-                  )}
-                </TouchableOpacity>
+              {item.status === 'unavailable' && (
+                <Text style={styles.unavailableNote}>
+                  Ce créneau n’est pas disponible. Proposez-en un autre pour que votre réservation soit traitée.
+                </Text>
               )}
-            </View>
+              {item.status === 'proposed' && (
+                <Text style={styles.proposedNote}>
+                  L’établissement vous propose ce nouveau créneau. Confirmez-le pour valider votre réservation, ou annulez-la.
+                </Text>
+              )}
+              {(item.status === 'pending' || item.status === 'unavailable' || item.status === 'proposed') && (
+                <View style={styles.actionsRow}>
+                  {item.status === 'proposed' && (
+                    <TouchableOpacity
+                      style={styles.confirmBtn}
+                      onPress={() => handleConfirm(item.id)}
+                      disabled={confirmingId === item.id || cancellingId === item.id}
+                      accessibilityRole="button"
+                      accessibilityLabel="Confirmer le nouveau créneau"
+                    >
+                      {confirmingId === item.id ? (
+                        <ActivityIndicator size="small" color="#fff" />
+                      ) : (
+                        <>
+                          <FontIcon name="check" width={14} height={14} fill="#fff" />
+                          <Text style={styles.confirmBtnText}>Confirmer</Text>
+                        </>
+                      )}
+                    </TouchableOpacity>
+                  )}
+                  {item.status === 'pending' && (
+                    <TouchableOpacity
+                      style={styles.editBtn}
+                      onPress={() => setEditing({ reservation: item, mode: 'edit' })}
+                      accessibilityRole="button"
+                      accessibilityLabel="Modifier cette réservation"
+                    >
+                      <FontIcon name="pen" width={14} height={14} fill="#2563eb" />
+                      <Text style={styles.editBtnText}>Modifier</Text>
+                    </TouchableOpacity>
+                  )}
+                  {item.status === 'unavailable' && (
+                    <TouchableOpacity
+                      style={styles.rescheduleBtn}
+                      onPress={() => setEditing({ reservation: item, mode: 'reschedule' })}
+                      accessibilityRole="button"
+                      accessibilityLabel="Reprogrammer cette réservation"
+                    >
+                      <FontIcon name="calendar" width={14} height={14} fill="#fff" />
+                      <Text style={styles.rescheduleBtnText}>Reprogrammer</Text>
+                    </TouchableOpacity>
+                  )}
+                  <TouchableOpacity
+                    style={styles.cancelBtn}
+                    onPress={() => handleCancel(item.id)}
+                    disabled={cancellingId === item.id || confirmingId === item.id}
+                    accessibilityRole="button"
+                    accessibilityLabel="Annuler cette réservation"
+                  >
+                    {cancellingId === item.id ? (
+                      <ActivityIndicator size="small" color="#dc2626" />
+                    ) : (
+                      <Text style={styles.cancelBtnText}>Annuler</Text>
+                    )}
+                  </TouchableOpacity>
+                </View>
+              )}            </View>
           );
         }}
+      />
+
+      <ReservationEditModal
+        reservation={editing?.reservation ?? null}
+        mode={editing?.mode ?? 'edit'}
+        onClose={() => setEditing(null)}
+        onSaved={handleSaved}
       />
     </View>
   );
@@ -289,8 +382,58 @@ const styles = StyleSheet.create({
   cardGuestsItem: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   cardNoteRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   cardNote: { color: colors.textSecondary, fontSize: 13, fontStyle: 'italic', marginTop: 0, flexShrink: 1 },
+  unavailableNote: {
+    color: colors.unavailable,
+    backgroundColor: colors.unavailableBg,
+    borderRadius: radius.sm,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    fontSize: 13,
+    marginTop: 4,
+  },
+  proposedNote: {
+    color: colors.proposed,
+    backgroundColor: colors.proposedBg,
+    borderRadius: radius.sm,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    fontSize: 13,
+    marginTop: 4,
+  },
+  actionsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 8 },
+  confirmBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: radius.md,
+    backgroundColor: colors.success,
+  },
+  confirmBtnText: { color: colors.surface, fontSize: 13, fontWeight: '700' },
+  editBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.primary,
+    backgroundColor: colors.primarySoft,
+  },
+  editBtnText: { color: colors.primary, fontSize: 13, fontWeight: '700' },
+  rescheduleBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: radius.md,
+    backgroundColor: colors.primary,
+  },
+  rescheduleBtnText: { color: colors.surface, fontSize: 13, fontWeight: '700' },
   cancelBtn: {
-    marginTop: 8,
     alignSelf: 'flex-start',
     paddingHorizontal: 14,
     paddingVertical: 8,

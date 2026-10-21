@@ -12,6 +12,22 @@ export interface Coordinates {
   longitude: number;
 }
 
+/** Statut d'un lieu : VIP (badge + bouton réservation sur les posts) ou normal. */
+export type PlaceStatus = 'normal' | 'vip';
+
+/**
+ * Statut d'une réservation.
+ * 'unavailable' = créneau refusé, à reprogrammer ;
+ * 'proposed' = nouveau créneau proposé par l'établissement, que le client doit confirmer.
+ */
+export type ReservationStatus =
+  | 'pending'
+  | 'confirmed'
+  | 'cancelled'
+  | 'completed'
+  | 'unavailable'
+  | 'proposed';
+
 export interface Place {
   id: string;
   name: string;
@@ -29,7 +45,16 @@ export interface Place {
   photos?: string[];
   isOpen?: boolean;
   location?: Coordinates;
-  isPro?: boolean;
+  status?: PlaceStatus;
+}
+
+/** Lieu rattaché à un post (informations minimales pour le feed). */
+export interface FeedPlace {
+  id: string;
+  name: string;
+  category?: string;
+  address?: string;
+  status: PlaceStatus;
 }
 
 export interface MediaItem {
@@ -59,6 +84,8 @@ export interface FeedItem {
   commentsCount?: number;
   isBusiness: boolean;
   location: string;
+  /** Lieu rattaché au post (optionnel). Un lieu VIP affiche badge + bouton réservation. */
+  place?: FeedPlace;
   timestamp: string;
   hasLiked?: boolean;
 }

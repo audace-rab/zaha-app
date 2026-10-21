@@ -4,10 +4,13 @@ import type { Database } from '@/lib/supabase/database.types';
 
 type ReservationUpdate = Database['public']['Tables']['reservations']['Update'];
 
-const RESERVATION_STATUSES = ['pending', 'confirmed', 'cancelled', 'completed'];
+const RESERVATION_STATUSES = ['pending', 'confirmed', 'cancelled', 'completed', 'unavailable', 'proposed'];
 const PAYMENT_STATUSES = ['unpaid', 'pending', 'paid', 'refunded'];
 
-/** Mise à jour du statut d'une réservation (et optionnellement du paiement). */
+/**
+ * Mise à jour d'une réservation : statut, paiement, note et reprogrammation
+ * (date / horaires — utilisée pour proposer un autre créneau à une réservation indisponible).
+ */
 export async function PATCH(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
@@ -27,6 +30,9 @@ export async function PATCH(
       status?: string;
       paymentStatus?: string;
       note?: string;
+      date?: string;
+      timeStart?: string | null;
+      timeEnd?: string | null;
     };
 
     const payload: ReservationUpdate = {};
@@ -53,6 +59,26 @@ export async function PATCH(
 
     if (body.note !== undefined) {
       payload.note = body.note;
+    }
+
+    // Reprogrammation
+    if (body.date !== undefined) {
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(body.date)) {
+        return errorResponse('date must be formatted YYYY-MM-DD', 400);
+      }
+      payload.date = body.date;
+    }
+    const timePattern = /^\d{2}:\d{2}(:\d{2})?$/;
+    for (const [key, column] of [['timeStart', 'time_start'], ['timeEnd', 'time_end']] as const) {
+      const value = body[key];
+      if (value === undefined) continue;
+      if (value !== null && !timePattern.test(value)) {
+        return errorResponse(`${key} must be formatted HH:MM`, 400);
+      }
+      payload[column] = value;
+    }
+    if (payload.time_start && payload.time_end && payload.time_end <= payload.time_start) {
+      return errorResponse('timeEnd must be after timeStart', 400);
     }
 
     if (Object.keys(payload).length === 0) {

@@ -1,5 +1,6 @@
 import { requireUser } from '@/lib/api/auth';
 import { errorResponse, jsonResponse, optionsResponse } from '@/lib/api/response';
+import { isValidUuid } from '@/services/postService';
 
 interface MediaItem {
   url: string;
@@ -16,6 +17,7 @@ export async function POST(request: Request) {
     const body = (await request.json()) as {
       content?: string;
       location?: string;
+      placeId?: string;
       media?: MediaItem[];
     };
 
@@ -25,6 +27,23 @@ export async function POST(request: Request) {
 
     const supabase = auth.supabase;
 
+    // Lieu rattaché (optionnel) : doit exister
+    let placeId: string | null = null;
+    if (body.placeId) {
+      if (!isValidUuid(body.placeId)) {
+        return errorResponse('placeId must be a valid UUID', 400);
+      }
+      const { data: place } = await supabase
+        .from('places')
+        .select('id')
+        .eq('id', body.placeId)
+        .maybeSingle();
+      if (!place) {
+        return errorResponse('Place not found', 404);
+      }
+      placeId = place.id;
+    }
+
     // Créer le post (RLS : author_id = auth.uid())
     const { data: post, error: postError } = await supabase
       .from('posts')
@@ -32,6 +51,7 @@ export async function POST(request: Request) {
         author_id: auth.userId,
         content: body.content?.trim() ?? '',
         location: body.location?.trim() ?? '',
+        place_id: placeId,
       })
       .select('id')
       .maybeSingle();

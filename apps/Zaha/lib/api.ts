@@ -11,6 +11,16 @@ type ChatMessage = {
   sources?: { uri: string; title: string }[];
 };
 
+export type PlaceStatus = 'normal' | 'vip';
+
+export type FeedPlace = {
+  id: string;
+  name: string;
+  category?: string;
+  address?: string;
+  status: PlaceStatus;
+};
+
 type FeedItem = {
   id: string;
   authorId: string;
@@ -24,6 +34,7 @@ type FeedItem = {
   commentsCount?: number;
   isBusiness: boolean;
   location: string;
+  place?: FeedPlace;
   timestamp: string;
   hasLiked?: boolean;
 };
@@ -58,7 +69,8 @@ type Place = {
   googleMapsUri?: string;
   photoUrl?: string;
   openingHours?: string;
-  isPro?: boolean;
+  photos?: string[];
+  status?: PlaceStatus;
   location?: Coordinates;
 };
 
@@ -76,7 +88,8 @@ type MapPlace = {
   latitude: number;
   longitude: number;
   photoUrl?: string;
-  isPro?: boolean;
+  photos?: string[];
+  status?: PlaceStatus;
   address?: string;
 };
 
@@ -125,6 +138,14 @@ type ChatResponse = {
   sources?: { uri: string; title: string }[];
 };
 
+export type ReservationStatus =
+  | 'pending'
+  | 'confirmed'
+  | 'cancelled'
+  | 'completed'
+  | 'unavailable'
+  | 'proposed';
+
 export type Reservation = {
   id: string;
   user_id: string;
@@ -139,7 +160,7 @@ export type Reservation = {
   activity_slot?: string;
   price?: number;
   currency?: string;
-  status: 'pending' | 'confirmed' | 'cancelled' | 'completed';
+  status: ReservationStatus;
   payment_method?: string;
   payment_status?: string;
   note?: string;
@@ -348,10 +369,15 @@ export const api = {
   fetchCategories: () =>
     apiFetch<{ categories: CategoryCount[] }>('/api/places/categories'),
 
-  createPost: (content: string, location?: string, media?: { url: string; type: string }[]) =>
+  createPost: (
+    content: string,
+    location?: string,
+    media?: { url: string; type: string }[],
+    placeId?: string
+  ) =>
     apiFetch<{ post: FeedItem }>('/api/posts', {
       method: 'POST',
-      body: JSON.stringify({ content, location, media }),
+      body: JSON.stringify({ content, location, media, placeId }),
     }),
 
   uploadPostMedia: (fileUri: string) => {
@@ -416,6 +442,13 @@ export const api = {
   cancelReservation: (id: string) =>
     apiFetch<{ reservation: Reservation }>(`/api/reservations/${id}`, {
       method: 'DELETE',
+    }),
+
+  // Le client accepte le créneau proposé par l'établissement (statut "proposed" -> "confirmed").
+  confirmReservation: (id: string) =>
+    apiFetch<{ reservation: Reservation }>(`/api/reservations/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify({ status: 'confirmed' }),
     }),
 
   updateReservation: (id: string, data: Partial<CreateReservationData>) =>
