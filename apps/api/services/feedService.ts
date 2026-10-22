@@ -36,6 +36,7 @@ export async function getFeed(filters?: FeedFilters): Promise<FeedPage> {
           name,
           category,
           address,
+          phone,
           status
         ),
         post_media ( type, url, sort_order )
@@ -115,7 +116,10 @@ export async function getFeed(filters?: FeedFilters): Promise<FeedPage> {
               name: place.name,
               category: place.category ?? undefined,
               address: place.address ?? undefined,
-              status: (place.status === 'vip' ? 'vip' : 'normal') as PlaceStatus,
+              phoneNumber: place.phone ?? undefined,
+              status: (
+                place.status === 'vip' || place.status === 'premium' ? place.status : 'normal'
+              ) as PlaceStatus,
             }
           : undefined,
         timestamp: new Date(post.created_at).toISOString(),

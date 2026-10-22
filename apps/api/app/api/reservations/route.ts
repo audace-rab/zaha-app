@@ -1,7 +1,11 @@
 import { requireUser } from '@/lib/api/auth';
 import { errorResponse, jsonResponse, optionsResponse } from '@/lib/api/response';
 import { isValidUuid } from '@/services/postService';
-import { createReservation, getReservationsByUser } from '@/services/reservationService';
+import {
+  createReservation,
+  getReservationsByUser,
+  ReservationError,
+} from '@/services/reservationService';
 
 export async function POST(request: Request) {
   try {
@@ -14,10 +18,12 @@ export async function POST(request: Request) {
       placeId?: string;
       reservationType?: string;
       date?: string;
+      dateEnd?: string;
       timeStart?: string;
       timeEnd?: string;
       guests?: number;
       roomType?: string;
+      roomTypeId?: string;
       activitySlot?: string;
       paymentMethod?: string;
       note?: string;
@@ -35,16 +41,25 @@ export async function POST(request: Request) {
       return errorResponse('reservationType must be one of: general, table, hotel, activity', 400);
     }
 
+    if (body.roomTypeId !== undefined && !isValidUuid(body.roomTypeId)) {
+      return errorResponse('roomTypeId must be a valid UUID', 400);
+    }
+    if (body.dateEnd !== undefined && !/^\d{4}-\d{2}-\d{2}$/.test(body.dateEnd)) {
+      return errorResponse('dateEnd must be formatted YYYY-MM-DD', 400);
+    }
+
     // userId toujours issu du JWT ; price/paymentStatus ignorés (forcés serveur)
     const reservation = await createReservation(auth.supabase, {
       userId: auth.userId,
       placeId: body.placeId,
       reservationType: body.reservationType,
       date: body.date,
+      dateEnd: body.dateEnd,
       timeStart: body.timeStart,
       timeEnd: body.timeEnd,
       guests: body.guests,
       roomType: body.roomType,
+      roomTypeId: body.roomTypeId,
       activitySlot: body.activitySlot,
       paymentMethod: body.paymentMethod,
       note: body.note,
@@ -56,6 +71,9 @@ export async function POST(request: Request) {
 
     return jsonResponse({ reservation }, 201);
   } catch (error) {
+    if (error instanceof ReservationError) {
+      return errorResponse(error.message, error.status);
+    }
     console.error('POST /api/reservations', error);
     return errorResponse('Failed to create reservation');
   }

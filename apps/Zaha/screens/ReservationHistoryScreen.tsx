@@ -13,7 +13,7 @@ import {
 } from 'react-native';
 import { api, type Reservation } from '../lib/api';
 import { useAuthUser } from '../lib/useAuthUser';
-import { formatDateDisplay } from '../lib/format';
+import { countNights, formatDateDisplay, formatMoney, formatNights } from '../lib/format';
 import FontIcon from '../components/FontIcon';
 import ReservationEditModal from '../components/ReservationEditModal';
 import { colors, radius } from '../theme';
@@ -222,6 +222,16 @@ export default function ReservationHistoryScreen({ onBack }: ReservationHistoryS
               <View style={styles.cardDateRow}>
                 <FontIcon name="calendar" width={14} height={14} fill="#374151" />
                 <Text style={styles.cardDate}>{formatDateDisplay(item.date)}</Text>
+                {item.reservation_type === 'hotel' && item.date_end ? (
+                  <>
+                    <Text style={styles.cardDate}>→ {formatDateDisplay(item.date_end)}</Text>
+                    {countNights(item.date, item.date_end) > 0 ? (
+                      <Text style={styles.cardDate}>
+                        · {formatNights(countNights(item.date, item.date_end))}
+                      </Text>
+                    ) : null}
+                  </>
+                ) : null}
                 {item.time_start ? (
                   <>
                     <FontIcon name="clock" width={14} height={14} fill="#374151" />
@@ -234,13 +244,19 @@ export default function ReservationHistoryScreen({ onBack }: ReservationHistoryS
                 <View style={styles.cardGuestsItem}>
                   <FontIcon name="users" width={14} height={14} fill="#6b7280" />
                   <Text style={styles.cardGuests}>
-                    {item.guests} convive{item.guests > 1 ? 's' : ''}
+                    {item.guests} {item.reservation_type === 'hotel' ? 'voyageur' : 'convive'}
+                    {item.guests > 1 ? 's' : ''}
                   </Text>
                 </View>
                 {item.room_type ? (
                   <View style={styles.cardGuestsItem}>
                     <FontIcon name="bed" width={14} height={14} fill="#6b7280" />
                     <Text style={styles.cardGuests}>{item.room_type}</Text>
+                  </View>
+                ) : null}
+                {item.reservation_type === 'hotel' && item.price ? (
+                  <View style={styles.cardGuestsItem}>
+                    <Text style={styles.cardGuests}>{formatMoney(item.price, item.currency)}</Text>
                   </View>
                 ) : null}
                 {item.activity_slot ? (

@@ -4,7 +4,7 @@ import type { Database } from '@/lib/supabase/database.types';
 
 type PlaceUpdate = Database['public']['Tables']['places']['Update'];
 
-const PLACE_STATUSES = ['normal', 'vip'];
+const PLACE_STATUSES = ['normal', 'vip', 'premium'];
 
 export async function GET(
   _request: Request,
@@ -57,7 +57,7 @@ export async function PATCH(
     // Liste blanche des champs modifiables
     const payload: PlaceUpdate = {};
     const fields = [
-      'name', 'category', 'place_type', 'address', 'snippet',
+      'name', 'category', 'place_type', 'address', 'phone', 'snippet',
       'opening_hours', 'rating', 'latitude', 'longitude',
       'google_maps_uri', 'photo_url', 'status', 'city_id', 'external_id',
     ] as const;

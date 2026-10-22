@@ -145,9 +145,9 @@ export default function PlacesPage() {
                     {place.rating != null ? place.rating.toFixed(1) : '—'}
                   </td>
                   <td className="px-4 py-3">
-                    {place.status === 'vip' ? (
+                    {place.status === 'vip' || place.status === 'premium' ? (
                       <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700">
-                        VIP
+                        {place.status === 'premium' ? 'Premium' : 'VIP'}
                       </span>
                     ) : (
                       <span className="text-slate-500">Normal</span>

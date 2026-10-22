@@ -4,7 +4,7 @@ import { jsonResponse, errorResponse, isValidUuid } from '@/lib/api';
 /**
  * Rattache un post à un lieu (ou le détache avec placeId = null).
  * Body : { "placeId": "<uuid>" | null }
- * Un post rattaché à un lieu VIP affiche badge VIP + bouton réservation sur mobile.
+ * Un post rattaché à un lieu VIP ou Premium affiche badge + boutons réserver / appeler sur mobile.
  */
 export async function PATCH(
   request: Request,

@@ -1,7 +1,12 @@
 import { requireUser } from '@/lib/api/auth';
 import { errorResponse, jsonResponse, optionsResponse } from '@/lib/api/response';
 import { isValidUuid } from '@/services/postService';
-import { cancelReservation, getReservationById, updateReservation } from '@/services/reservationService';
+import {
+  cancelReservation,
+  getReservationById,
+  ReservationError,
+  updateReservation,
+} from '@/services/reservationService';
 
 export async function GET(
   request: Request,
@@ -53,8 +58,10 @@ export async function PUT(
       note?: string;
       guests?: number;
       roomType?: string;
+      roomTypeId?: string;
       activitySlot?: string;
       date?: string;
+      dateEnd?: string;
       timeStart?: string;
       timeEnd?: string;
     };
@@ -62,6 +69,12 @@ export async function PUT(
 
     if (body.date !== undefined && !/^\d{4}-\d{2}-\d{2}$/.test(body.date)) {
       return errorResponse('date must be formatted YYYY-MM-DD', 400);
+    }
+    if (body.dateEnd !== undefined && !/^\d{4}-\d{2}-\d{2}$/.test(body.dateEnd)) {
+      return errorResponse('dateEnd must be formatted YYYY-MM-DD', 400);
+    }
+    if (body.roomTypeId !== undefined && !isValidUuid(body.roomTypeId)) {
+      return errorResponse('roomTypeId must be a valid UUID', 400);
     }
     if (body.timeStart && body.timeEnd && body.timeEnd <= body.timeStart) {
       return errorResponse('timeEnd must be after timeStart', 400);
@@ -77,10 +90,14 @@ export async function PUT(
 
     const status = existing.status;
     const slotFields =
-      body.date !== undefined || body.timeStart !== undefined || body.timeEnd !== undefined;
+      body.date !== undefined ||
+      body.dateEnd !== undefined ||
+      body.timeStart !== undefined ||
+      body.timeEnd !== undefined;
     const otherFields =
       body.guests !== undefined ||
       body.roomType !== undefined ||
+      body.roomTypeId !== undefined ||
       body.activitySlot !== undefined ||
       body.note !== undefined ||
       body.paymentMethod !== undefined;
@@ -120,6 +137,13 @@ export async function PUT(
       if (body.activitySlot !== undefined && existing.reservation_type !== 'activity') {
         return errorResponse('activitySlot n\u2019est valable que pour une réservation d\u2019activité', 400);
       }
+      const isHotel = existing.reservation_type === 'hotel';
+      if ((body.roomTypeId !== undefined || body.dateEnd !== undefined) && !isHotel) {
+        return errorResponse('roomTypeId et dateEnd ne sont valables que pour une réservation d\u2019hôtel', 400);
+      }
+      if (isHotel && (body.timeStart !== undefined || body.timeEnd !== undefined)) {
+        return errorResponse('Une réservation d\u2019hôtel n\u2019a pas d\u2019horaires (arrivée et départ uniquement)', 400);
+      }
     }
 
     // Un nouveau créneau remet une réservation indisponible en attente.
@@ -131,8 +155,10 @@ export async function PUT(
       note: body.note,
       guests: body.guests,
       roomType: body.roomType,
+      roomTypeId: body.roomTypeId,
       activitySlot: body.activitySlot,
       date: body.date,
+      dateEnd: body.dateEnd,
       timeStart: body.timeStart,
       timeEnd: body.timeEnd,
     });
@@ -143,6 +169,9 @@ export async function PUT(
 
     return jsonResponse({ reservation: updated });
   } catch (error) {
+    if (error instanceof ReservationError) {
+      return errorResponse(error.message, error.status);
+    }
     console.error('PUT /api/reservations/[id]', error);
     return errorResponse('Failed to update reservation');
   }

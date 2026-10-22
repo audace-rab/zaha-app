@@ -11,13 +11,37 @@ type ChatMessage = {
   sources?: { uri: string; title: string }[];
 };
 
-export type PlaceStatus = 'normal' | 'vip';
+/** VIP et Premium sont équivalents ; "normal" n'a ni bouton Réserver ni Appeler. */
+export type PlaceStatus = 'normal' | 'vip' | 'premium';
+
+/** Vrai si le lieu est VIP ou Premium (boutons Réserver / Appeler visibles). */
+export function isReservableStatus(status?: PlaceStatus | null): boolean {
+  return status === 'vip' || status === 'premium';
+}
+
+/** Libellé du badge d'un lieu (null pour un lieu normal). */
+export function placeBadgeLabel(status?: PlaceStatus | null): string | null {
+  if (status === 'vip') return 'VIP';
+  if (status === 'premium') return 'Premium';
+  return null;
+}
+
+export type RoomType = {
+  id: string;
+  placeId: string;
+  name: string;
+  description?: string;
+  capacity: number;
+  pricePerNight: number;
+  currency: string;
+};
 
 export type FeedPlace = {
   id: string;
   name: string;
   category?: string;
   address?: string;
+  phoneNumber?: string;
   status: PlaceStatus;
 };
 
@@ -91,6 +115,7 @@ type MapPlace = {
   photos?: string[];
   status?: PlaceStatus;
   address?: string;
+  phoneNumber?: string;
 };
 
 type PlacesSearchResponse = {
@@ -152,10 +177,14 @@ export type Reservation = {
   place_id: string;
   place_name?: string;
   reservation_type: 'table' | 'hotel' | 'activity' | 'general';
+  /** Hôtel : date d'arrivée. */
   date: string;
+  /** Hôtel : date de départ. */
+  date_end?: string | null;
   time_start?: string;
   time_end?: string;
   guests: number;
+  room_type_id?: string | null;
   room_type?: string;
   activity_slot?: string;
   price?: number;
@@ -171,11 +200,16 @@ export type Reservation = {
 export type CreateReservationData = {
   placeId: string;
   reservationType?: string;
+  /** Hôtel : date d'arrivée. */
   date: string;
+  /** Hôtel : date de départ. */
+  dateEnd?: string;
   timeStart?: string;
   timeEnd?: string;
   guests?: number;
   roomType?: string;
+  /** Hôtel : chambre choisie. */
+  roomTypeId?: string;
   activitySlot?: string;
   note?: string;
 };
@@ -418,10 +452,12 @@ export const api = {
         placeId: data.placeId,
         reservationType: data.reservationType ?? 'general',
         date: data.date,
+        dateEnd: data.dateEnd,
         timeStart: data.timeStart,
         timeEnd: data.timeEnd,
         guests: data.guests ?? 1,
         roomType: data.roomType,
+        roomTypeId: data.roomTypeId,
         activitySlot: data.activitySlot,
         note: data.note,
       }),
@@ -456,6 +492,10 @@ export const api = {
       method: 'PUT',
       body: JSON.stringify(data),
     }),
+
+  // Types de chambre (et prix par nuit) d'un hôtel.
+  fetchRooms: (placeId: string) =>
+    apiFetch<{ rooms: RoomType[] }>(`/api/places/${placeId}/rooms`),
 
   getAvailability: (placeId: string, date: string) =>
     apiFetch<{ available: boolean; slots: string[] }>(

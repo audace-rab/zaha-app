@@ -93,8 +93,10 @@ create table if not exists public.places (
   photo_url text,
   -- Photos (carrousel) : l'ordre = ordre d'affichage, la 1re = couverture (photo_url)
   photos text[] not null default '{}',
-  -- Statut du lieu : 'normal' ou 'vip' (badge VIP + bouton réservation sur les posts)
-  status text not null default 'normal' check (status in ('normal', 'vip')),
+  -- Téléphone (bouton « Appeler », réservé aux lieux vip / premium)
+  phone text,
+  -- Statut du lieu : 'normal', 'vip' ou 'premium' (badge + boutons Réserver/Appeler)
+  status text not null default 'normal' check (status in ('normal', 'vip', 'premium')),
   city_id uuid references public.cities(id) on delete set null,
   created_at timestamptz not null default now()
 );
@@ -183,15 +185,32 @@ create table if not exists public.follows (
 -- ----------------------------------------------------------------------------
 -- 2.9 Réservations (système de réservation complet)
 -- ----------------------------------------------------------------------------
+-- Types de chambre par lieu (hôtels) : lecture publique, écriture back-office (service_role)
+create table if not exists public.place_room_types (
+  id uuid primary key default uuid_generate_v4(),
+  place_id uuid not null references public.places(id) on delete cascade,
+  name text not null,
+  description text,
+  capacity int not null default 2 check (capacity >= 1),
+  price_per_night numeric(12,2) not null default 0 check (price_per_night >= 0),
+  currency text not null default 'MGA',
+  sort_order int not null default 0,
+  is_active boolean not null default true,
+  created_at timestamptz not null default now()
+);
+
 create table if not exists public.reservations (
   id uuid primary key default uuid_generate_v4(),
   user_id uuid not null references public.profiles(id) on delete cascade,
   place_id uuid not null references public.places(id) on delete cascade,
   reservation_type text not null default 'general',
+  -- Hôtel : date = arrivée, date_end = départ (sans heures). Autres : une seule date + heures.
   date date not null,
+  date_end date check (date_end is null or date_end >= date),
   time_start time,
   time_end time,
   guests int default 1,
+  room_type_id uuid references public.place_room_types(id) on delete set null,
   room_type text,
   activity_slot text,
   price decimal(10,2) default 0,
@@ -232,6 +251,8 @@ create index if not exists bookmarks_place_idx on public.bookmarks (place_id);
 create index if not exists reviews_place_idx on public.place_reviews (place_id);
 create index if not exists follows_follower_idx on public.follows (follower_id);
 create index if not exists follows_following_idx on public.follows (following_id);
+
+create index if not exists place_room_types_place_idx on public.place_room_types (place_id, sort_order);
 
 create index if not exists reservations_user_idx on public.reservations (user_id);
 create index if not exists reservations_place_idx on public.reservations (place_id);
@@ -279,6 +300,12 @@ alter table public.bookmarks enable row level security;
 alter table public.place_reviews enable row level security;
 alter table public.follows enable row level security;
 alter table public.reservations enable row level security;
+alter table public.place_room_types enable row level security;
+
+-- Types de chambre : publics en lecture
+drop policy if exists "Room types are public" on public.place_room_types;
+create policy "Room types are public"
+  on public.place_room_types for select using (true);
 
 -- Profiles : lecture publique, édition par le propriétaire
 drop policy if exists "Profiles are viewable by everyone" on public.profiles;

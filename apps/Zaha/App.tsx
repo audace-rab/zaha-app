@@ -3,6 +3,7 @@ import { ActivityIndicator, BackHandler, SafeAreaView, StatusBar, StyleSheet, Te
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { supabase } from './lib/supabase';
+import type { PlaceStatus } from './lib/api';
 import AuthScreen from './screens/AuthScreen';
 import ChatScreen from './screens/ChatScreen';
 import FavoritesScreen from './screens/FavoritesScreen';
@@ -28,7 +29,7 @@ type SelectedPlace = {
   googleMapsUri?: string;
   photoUrl?: string;
   openingHours?: string;
-  status?: 'normal' | 'vip';
+  status?: PlaceStatus;
   location?: { latitude: number; longitude: number };
 };
 

@@ -6,6 +6,18 @@ import type { Database } from '@/lib/supabase/database.types';
 
 type Place = Database['public']['Tables']['places']['Row'];
 
+/** Chambre en cours d'édition (id absent = pas encore enregistrée). */
+interface RoomDraft {
+  id?: string;
+  name: string;
+  description: string;
+  capacity: string;
+  price_per_night: string;
+  is_active: boolean;
+}
+
+const DEFAULT_ROOM_NAMES = ['Simple', 'Double', 'Suite', 'Familiale'];
+
 interface PlaceFormProps {
   /** Lieu existant (édition) ou null (création). */
   initialPlace?: Place | null;
@@ -24,6 +36,7 @@ export default function PlaceForm({ initialPlace = null }: PlaceFormProps) {
     category: initialPlace?.category ?? '',
     place_type: initialPlace?.place_type ?? '',
     address: initialPlace?.address ?? '',
+    phone: initialPlace?.phone ?? '',
     snippet: initialPlace?.snippet ?? '',
     opening_hours: initialPlace?.opening_hours ?? '',
     rating: initialPlace?.rating?.toString() ?? '',
@@ -42,12 +55,65 @@ export default function PlaceForm({ initialPlace = null }: PlaceFormProps) {
   const [photoUrlDraft, setPhotoUrlDraft] = useState('');
   const [uploading, setUploading] = useState(false);
 
+  // Chambres (hôtels) : l'ordre du tableau = ordre d'affichage dans l'app.
+  const [rooms, setRooms] = useState<RoomDraft[]>([]);
+  const [roomsLoaded, setRoomsLoaded] = useState(!initialPlace);
+
+  const isHotel = [form.category, form.place_type].some((v) =>
+    ['hotel', 'hôtel'].includes(v.trim().toLowerCase())
+  );
+
   useEffect(() => {
     fetch('/api/admin/places/categories')
       .then((r) => (r.ok ? r.json() : { categories: [] }))
       .then((d) => setCategories(d.categories))
       .catch(() => {});
   }, []);
+
+  useEffect(() => {
+    if (!initialPlace) return;
+    fetch(`/api/admin/places/${initialPlace.id}/rooms`)
+      .then((r) => (r.ok ? r.json() : { rooms: [] }))
+      .then((d) => {
+        setRooms(
+          (d.rooms as Database['public']['Tables']['place_room_types']['Row'][]).map((r) => ({
+            id: r.id,
+            name: r.name,
+            description: r.description ?? '',
+            capacity: String(r.capacity),
+            price_per_night: String(r.price_per_night),
+            is_active: r.is_active,
+          }))
+        );
+        setRoomsLoaded(true);
+      })
+      .catch(() => setRoomsLoaded(true));
+  }, [initialPlace]);
+
+  function addRoom(name = '') {
+    setRooms((prev) => [
+      ...prev,
+      { name, description: '', capacity: '2', price_per_night: '0', is_active: true },
+    ]);
+  }
+
+  function updateRoom(index: number, patch: Partial<RoomDraft>) {
+    setRooms((prev) => prev.map((r, i) => (i === index ? { ...r, ...patch } : r)));
+  }
+
+  function removeRoom(index: number) {
+    setRooms((prev) => prev.filter((_, i) => i !== index));
+  }
+
+  function moveRoom(index: number, direction: -1 | 1) {
+    setRooms((prev) => {
+      const target = index + direction;
+      if (target < 0 || target >= prev.length) return prev;
+      const next = [...prev];
+      [next[index], next[target]] = [next[target], next[index]];
+      return next;
+    });
+  }
 
   function set(field: keyof typeof form, value: string | boolean) {
     setForm((f) => ({ ...f, [field]: value }));
@@ -113,6 +179,7 @@ export default function PlaceForm({ initialPlace = null }: PlaceFormProps) {
       category: form.category,
       place_type: form.place_type || null,
       address: form.address || null,
+      phone: form.phone.trim() || null,
       snippet: form.snippet || null,
       opening_hours: form.opening_hours || null,
       rating: parseNumber(form.rating),
@@ -133,10 +200,42 @@ export default function PlaceForm({ initialPlace = null }: PlaceFormProps) {
         }
       );
 
+      const saved = await res.json().catch(() => ({}));
       if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        setError(data.error ?? 'Échec de l’enregistrement.');
+        setError(saved.error ?? 'Échec de l’enregistrement.');
         return;
+      }
+
+      // Chambres : uniquement pour les hôtels, et seulement si la liste a bien été chargée
+      // (évite d'effacer des chambres existantes en cas d'échec du chargement).
+      if (isHotel && roomsLoaded) {
+        const placeId: string = isEdit ? initialPlace.id : saved.place?.id;
+        const roomsRes = await fetch(`/api/admin/places/${placeId}/rooms`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            rooms: rooms.map((r) => ({
+              id: r.id,
+              name: r.name,
+              description: r.description,
+              capacity: Number(r.capacity),
+              price_per_night: Number(r.price_per_night),
+              is_active: r.is_active,
+            })),
+          }),
+        });
+        if (!roomsRes.ok) {
+          const data = await roomsRes.json().catch(() => ({}));
+          const message = `Lieu enregistré, mais chambres non enregistrées : ${data.error ?? 'erreur inconnue'}`;
+          if (!isEdit && placeId) {
+            // Le lieu existe désormais : on passe en édition pour éviter un doublon.
+            window.alert(message);
+            router.replace(`/places/${placeId}`);
+          } else {
+            setError(message);
+          }
+          return;
+        }
       }
 
       router.push('/places');
@@ -198,6 +297,21 @@ export default function PlaceForm({ initialPlace = null }: PlaceFormProps) {
           <input id="address" value={form.address} onChange={(e) => set('address', e.target.value)} className={inputClass} />
         </div>
 
+        <div className="space-y-2">
+          <label className={labelClass} htmlFor="phone">Téléphone</label>
+          <input
+            id="phone"
+            type="tel"
+            value={form.phone}
+            onChange={(e) => set('phone', e.target.value)}
+            className={inputClass}
+            placeholder="+261 34 00 000 00"
+          />
+          <p className="text-xs text-slate-500">
+            Utilisé par le bouton « Appeler » (lieux VIP et Premium uniquement).
+          </p>
+        </div>
+
         <div className="space-y-2 sm:col-span-2">
           <label className={labelClass} htmlFor="snippet">Description courte</label>
           <textarea id="snippet" rows={3} value={form.snippet} onChange={(e) => set('snippet', e.target.value)} className={inputClass} />
@@ -226,8 +340,9 @@ export default function PlaceForm({ initialPlace = null }: PlaceFormProps) {
             onChange={(e) => set('status', e.target.value)}
             className={inputClass}
           >
-            <option value="normal">Normal</option>
-            <option value="vip">VIP (badge + bouton de réservation sur les posts)</option>
+            <option value="normal">Normal (sans boutons Réserver / Appeler)</option>
+            <option value="vip">VIP (badge + boutons Réserver / Appeler)</option>
+            <option value="premium">Premium (comme VIP)</option>
           </select>
         </div>
 
@@ -235,6 +350,130 @@ export default function PlaceForm({ initialPlace = null }: PlaceFormProps) {
           <label className={labelClass} htmlFor="google_maps_uri">Lien Google Maps</label>
           <input id="google_maps_uri" type="url" value={form.google_maps_uri} onChange={(e) => set('google_maps_uri', e.target.value)} className={inputClass} />
         </div>
+
+        {isHotel && (
+          <div className="space-y-3 sm:col-span-2">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <label className={labelClass}>Chambres ({rooms.length}) — types de chambre et prix par nuit</label>
+              <button
+                type="button"
+                onClick={() => addRoom()}
+                className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm text-slate-700 transition hover:bg-slate-100"
+              >
+                Ajouter une chambre
+              </button>
+            </div>
+
+            {!roomsLoaded ? (
+              <p className="text-sm text-slate-500">Chargement des chambres…</p>
+            ) : rooms.length === 0 ? (
+              <div className="rounded-lg border border-dashed border-slate-300 px-4 py-4 text-sm text-slate-500">
+                <p>
+                  Aucune chambre. Sans chambre, les clients ne pourront pas réserver cet hôtel.
+                </p>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {DEFAULT_ROOM_NAMES.map((name) => (
+                    <button
+                      key={name}
+                      type="button"
+                      onClick={() => addRoom(name)}
+                      className="rounded-full border border-slate-300 px-3 py-1 text-xs text-slate-700 hover:bg-slate-100"
+                    >
+                      + {name}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <ul className="space-y-3">
+                {rooms.map((room, index) => (
+                  <li
+                    key={room.id ?? `new-${index}`}
+                    className="grid gap-3 rounded-lg border border-slate-200 bg-slate-50 p-3 sm:grid-cols-6"
+                  >
+                    <div className="space-y-1 sm:col-span-2">
+                      <label className="text-xs font-medium text-slate-600">Nom *</label>
+                      <input
+                        required
+                        value={room.name}
+                        onChange={(e) => updateRoom(index, { name: e.target.value })}
+                        className={inputClass}
+                        placeholder="Double, Suite…"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-xs font-medium text-slate-600">Capacité</label>
+                      <input
+                        type="number"
+                        min="1"
+                        max="50"
+                        step="1"
+                        value={room.capacity}
+                        onChange={(e) => updateRoom(index, { capacity: e.target.value })}
+                        className={inputClass}
+                      />
+                    </div>
+                    <div className="space-y-1 sm:col-span-2">
+                      <label className="text-xs font-medium text-slate-600">Prix par nuit (MGA)</label>
+                      <input
+                        type="number"
+                        min="0"
+                        step="any"
+                        value={room.price_per_night}
+                        onChange={(e) => updateRoom(index, { price_per_night: e.target.value })}
+                        className={inputClass}
+                      />
+                    </div>
+                    <label className="flex items-end gap-2 pb-2 text-xs font-medium text-slate-600">
+                      <input
+                        type="checkbox"
+                        checked={room.is_active}
+                        onChange={(e) => updateRoom(index, { is_active: e.target.checked })}
+                      />
+                      Active
+                    </label>
+                    <div className="space-y-1 sm:col-span-6">
+                      <label className="text-xs font-medium text-slate-600">Description</label>
+                      <input
+                        value={room.description}
+                        onChange={(e) => updateRoom(index, { description: e.target.value })}
+                        className={inputClass}
+                        placeholder="1 lit double, climatisation, vue sur le lac…"
+                      />
+                    </div>
+                    <div className="flex gap-2 text-xs sm:col-span-6">
+                      <button
+                        type="button"
+                        onClick={() => moveRoom(index, -1)}
+                        disabled={index === 0}
+                        aria-label="Monter la chambre"
+                        className="rounded border border-slate-300 px-2 py-1 disabled:opacity-30"
+                      >
+                        ▲
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => moveRoom(index, 1)}
+                        disabled={index === rooms.length - 1}
+                        aria-label="Descendre la chambre"
+                        className="rounded border border-slate-300 px-2 py-1 disabled:opacity-30"
+                      >
+                        ▼
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => removeRoom(index)}
+                        className="ml-auto font-medium text-red-600 hover:underline"
+                      >
+                        Retirer
+                      </button>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        )}
 
         <div className="space-y-3 sm:col-span-2">
           <div className="flex items-center justify-between">

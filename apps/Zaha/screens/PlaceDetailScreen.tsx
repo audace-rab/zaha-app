@@ -15,7 +15,7 @@ import {
   useWindowDimensions,
 } from 'react-native';
 import MapView, { Marker } from 'react-native-maps';
-import { api } from '../lib/api';
+import { api, isReservableStatus, placeBadgeLabel, type PlaceStatus } from '../lib/api';
 import { useAuthUser } from '../lib/useAuthUser';
 import ReservationScreen from './ReservationScreen';
 import FontIcon from '../components/FontIcon';
@@ -34,7 +34,7 @@ type Place = {
   photoUrl?: string;
   photos?: string[];
   openingHours?: string;
-  status?: 'normal' | 'vip';
+  status?: PlaceStatus;
   location?: { latitude: number; longitude: number };
 };
 
@@ -183,6 +183,9 @@ export default function PlaceDetailScreen({ place }: PlaceDetailScreenProps) {
     );
   }
 
+  // Réserver / Appeler : réservés aux lieux VIP et Premium.
+  const canReserveAndCall = isReservableStatus(place.status);
+
   const openPhone = async () => {
     if (!place.phoneNumber) return;
     const tel = `tel:${place.phoneNumber.replace(/[^+\d]/g, '')}`;
@@ -319,7 +322,9 @@ export default function PlaceDetailScreen({ place }: PlaceDetailScreenProps) {
         )}
 
         <View style={styles.titleRow}>
-          {place.status === 'vip' && <Text style={styles.vipBadge}>VIP</Text>}
+          {placeBadgeLabel(place.status) && (
+            <Text style={styles.vipBadge}>{placeBadgeLabel(place.status)}</Text>
+          )}
           <Text style={styles.name}>{place.name}</Text>
         </View>
 
@@ -349,16 +354,24 @@ export default function PlaceDetailScreen({ place }: PlaceDetailScreenProps) {
           </View>
         ) : null}
         {place.phoneNumber ? (
-          <TouchableOpacity
-            style={styles.lineIconRow}
-            onPress={openPhone}
-            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-            accessibilityRole="link"
-            accessibilityLabel={`Appeler ${place.phoneNumber}`}
-          >
-            <FontIcon name="phone" width={14} height={14} fill="#374151" />
-            <Text style={[styles.line, styles.linkLine]}>{place.phoneNumber}</Text>
-          </TouchableOpacity>
+          canReserveAndCall ? (
+            <TouchableOpacity
+              style={styles.lineIconRow}
+              onPress={openPhone}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              accessibilityRole="link"
+              accessibilityLabel={`Appeler ${place.phoneNumber}`}
+            >
+              <FontIcon name="phone" width={14} height={14} fill="#374151" />
+              <Text style={[styles.line, styles.linkLine]}>{place.phoneNumber}</Text>
+            </TouchableOpacity>
+          ) : (
+            // Lieu normal : numéro affiché à titre d'information, sans action d'appel.
+            <View style={styles.lineIconRow}>
+              <FontIcon name="phone" width={14} height={14} fill="#374151" />
+              <Text style={styles.line}>{place.phoneNumber}</Text>
+            </View>
+          )
         ) : null}
         {place.websiteUri ? (
           <TouchableOpacity
@@ -376,17 +389,35 @@ export default function PlaceDetailScreen({ place }: PlaceDetailScreenProps) {
         ) : null}
         {place.snippet ? <Text style={styles.snippet}>{place.snippet}</Text> : null}
 
-        <TouchableOpacity
-          style={styles.reserveButton}
-          onPress={() => setShowReservation(true)}
-          accessibilityRole="button"
-          accessibilityLabel="Réserver ce lieu"
-        >
-          <View style={styles.iconButtonContent}>
-            <FontIcon name="calendar" width={16} height={16} fill="#fff" />
-            <Text style={styles.reserveButtonText}>Réserver</Text>
-          </View>
-        </TouchableOpacity>
+        {/* Réserver puis Appeler : uniquement pour les lieux VIP / Premium */}
+        {canReserveAndCall ? (
+          <>
+            <TouchableOpacity
+              style={styles.reserveButton}
+              onPress={() => setShowReservation(true)}
+              accessibilityRole="button"
+              accessibilityLabel="Réserver ce lieu"
+            >
+              <View style={styles.iconButtonContent}>
+                <FontIcon name="calendar" width={16} height={16} fill="#fff" />
+                <Text style={styles.reserveButtonText}>Réserver</Text>
+              </View>
+            </TouchableOpacity>
+            {place.phoneNumber ? (
+              <TouchableOpacity
+                style={styles.callButton}
+                onPress={openPhone}
+                accessibilityRole="button"
+                accessibilityLabel={`Appeler ${place.name}`}
+              >
+                <View style={styles.iconButtonContent}>
+                  <FontIcon name="phone" width={16} height={16} fill={colors.primary} />
+                  <Text style={styles.callButtonText}>Appeler</Text>
+                </View>
+              </TouchableOpacity>
+            ) : null}
+          </>
+        ) : null}
 
         <View style={styles.actionsRow}>
           {place.location && (
@@ -764,6 +795,17 @@ const styles = StyleSheet.create({
     marginTop: 12,
   },
   reserveButtonText: { color: colors.surface, fontWeight: '700', fontSize: 15 },
+  callButton: {
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.primary,
+    paddingVertical: 14,
+    borderRadius: radius.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 8,
+  },
+  callButtonText: { color: colors.primary, fontWeight: '700', fontSize: 15 },
   bookmarkButtonActive: {
     borderColor: colors.like,
     backgroundColor: colors.likeSoft,

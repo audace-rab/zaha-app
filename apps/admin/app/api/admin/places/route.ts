@@ -4,7 +4,7 @@ import type { Database } from '@/lib/supabase/database.types';
 
 type PlaceInsert = Database['public']['Tables']['places']['Insert'];
 
-const PLACE_STATUSES = ['normal', 'vip'];
+const PLACE_STATUSES = ['normal', 'vip', 'premium'];
 
 /** Liste paginée des lieux avec recherche (?q=) et filtre catégorie (?category=). */
 export async function GET(request: Request) {
@@ -68,6 +68,7 @@ export async function POST(request: Request) {
       category: body.category.trim(),
       place_type: body.place_type ?? null,
       address: body.address ?? null,
+      phone: body.phone?.trim() || null,
       snippet: body.snippet ?? null,
       opening_hours: body.opening_hours ?? null,
       rating: body.rating ?? null,

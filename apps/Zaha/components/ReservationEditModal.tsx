@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Modal,
@@ -11,10 +11,11 @@ import {
   View,
 } from 'react-native';
 import DateTimePicker, { type DateTimePickerEvent } from '@react-native-community/datetimepicker';
-import { api, type CreateReservationData, type Reservation } from '../lib/api';
-import { formatDateDisplay } from '../lib/format';
-import { ACTIVITY_SLOTS, ROOM_TYPES } from '../screens/ReservationScreen';
+import { api, type CreateReservationData, type Reservation, type RoomType } from '../lib/api';
+import { countNights, formatDateDisplay, formatNights } from '../lib/format';
+import { ACTIVITY_SLOTS } from '../screens/ReservationScreen';
 import FontIcon from './FontIcon';
+import RoomPicker from './RoomPicker';
 import { colors, radius } from '../theme';
 
 type ReservationEditModalProps = {
@@ -56,6 +57,12 @@ function startOfToday(): Date {
   return d;
 }
 
+function addDays(d: Date, days: number): Date {
+  const next = new Date(d);
+  next.setDate(next.getDate() + days);
+  return next;
+}
+
 export default function ReservationEditModal({
   reservation,
   mode,
@@ -69,8 +76,15 @@ export default function ReservationEditModal({
   const [showStart, setShowStart] = useState(false);
   const [showEnd, setShowEnd] = useState(false);
   const [guests, setGuests] = useState('1');
-  const [roomType, setRoomType] = useState('');
   const [activitySlot, setActivitySlot] = useState('');
+
+  // Hôtel : arrivée = dateObj, départ = checkOutObj, chambre choisie parmi celles du lieu.
+  const [checkOutObj, setCheckOutObj] = useState<Date>(addDays(startOfToday(), 1));
+  const [showCheckOut, setShowCheckOut] = useState(false);
+  const [rooms, setRooms] = useState<RoomType[]>([]);
+  const [roomsLoading, setRoomsLoading] = useState(false);
+  const [roomsError, setRoomsError] = useState<string | null>(null);
+  const [roomTypeId, setRoomTypeId] = useState('');
   const [note, setNote] = useState('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -85,47 +99,95 @@ export default function ReservationEditModal({
     setTimeStartObj(parseTime(reservation.time_start, 19));
     setTimeEndObj(parseTime(reservation.time_end, 21));
     setGuests(String(reservation.guests ?? 1));
-    setRoomType(reservation.room_type ?? '');
     setActivitySlot(reservation.activity_slot ?? '');
     setNote(reservation.note ?? '');
+    setRoomTypeId(reservation.room_type_id ?? '');
+    const previousEnd = reservation.date_end ? parseDate(reservation.date_end) : null;
+    const minEnd = addDays(previous < today ? today : previous, 1);
+    setCheckOutObj(previousEnd && previousEnd >= minEnd ? previousEnd : minEnd);
     setShowDate(false);
     setShowStart(false);
     setShowEnd(false);
+    setShowCheckOut(false);
     setError(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [reservationId, mode]);
 
+  // Hôtel (modification complète) : chambres disponibles du lieu.
+  const needsRooms = mode === 'edit' && reservation?.reservation_type === 'hotel';
+  const placeId = reservation?.place_id;
+  const loadRooms = useCallback(async () => {
+    if (!placeId) return;
+    setRoomsLoading(true);
+    setRoomsError(null);
+    try {
+      const { rooms: list } = await api.fetchRooms(placeId);
+      setRooms(list);
+    } catch (e) {
+      setRoomsError(e instanceof Error ? e.message : 'Impossible de charger les chambres.');
+    } finally {
+      setRoomsLoading(false);
+    }
+  }, [placeId]);
+
+  useEffect(() => {
+    if (needsRooms) loadRooms();
+  }, [needsRooms, loadRooms]);
+
   if (!reservation) return null;
 
   const isEdit = mode === 'edit';
-  const isHotel = isEdit && reservation.reservation_type === 'hotel';
+  const isHotelType = reservation.reservation_type === 'hotel';
+  const isHotel = isEdit && isHotelType;
   const isActivity = isEdit && reservation.reservation_type === 'activity';
+
+  const nights = isHotelType ? countNights(dateObj, checkOutObj) : 0;
+  const selectedRoom = rooms.find((r) => r.id === roomTypeId) ?? null;
+  // Ancienne réservation d'hôtel sans chambre : le choix n'est exigé que si on change les dates.
+  const legacyHotel = isHotelType && !reservation.room_type_id;
 
   const guestsInt = parseInt(guests, 10);
   const guestsError =
     isEdit && (Number.isNaN(guestsInt) || guestsInt < 1 || guestsInt > 50)
-      ? 'Le nombre de convives doit être entre 1 et 50.'
-      : null;
+      ? `Le nombre de ${isHotelType ? 'voyageurs' : 'convives'} doit être entre 1 et 50.`
+      : isHotel && selectedRoom && guestsInt > selectedRoom.capacity
+        ? `Cette chambre accueille ${selectedRoom.capacity} personne${selectedRoom.capacity > 1 ? 's' : ''} maximum.`
+        : null;
   const timeError =
-    formatTime(timeEndObj) <= formatTime(timeStartObj)
+    !isHotelType && formatTime(timeEndObj) <= formatTime(timeStartObj)
       ? 'L\u2019heure de fin doit être après l\u2019heure de début.'
       : null;
-  const roomError = isHotel && !roomType ? 'Sélectionnez un type de chambre.' : null;
-  const slotError = isActivity && !activitySlot ? 'Sélectionnez un créneau.' : null;
-  const formValid = !guestsError && !timeError && !roomError && !slotError;
+  const datesError = isHotelType && nights < 1 ? 'Le départ doit être après l\u2019arrivée.' : null;
 
   const previousStart = (reservation.time_start ?? '').slice(0, 5);
   const previousEnd = (reservation.time_end ?? '').slice(0, 5);
-  const slotChanged =
-    formatDateISO(dateObj) !== reservation.date ||
-    formatTime(timeStartObj) !== previousStart ||
-    formatTime(timeEndObj) !== previousEnd;
+  const slotChanged = isHotelType
+    ? formatDateISO(dateObj) !== reservation.date ||
+      formatDateISO(checkOutObj) !== (reservation.date_end ?? '')
+    : formatDateISO(dateObj) !== reservation.date ||
+      formatTime(timeStartObj) !== previousStart ||
+      formatTime(timeEndObj) !== previousEnd;
+  const roomChanged = isHotel && roomTypeId !== (reservation.room_type_id ?? '');
+
+  const roomError =
+    isHotel && !roomTypeId && (!legacyHotel || slotChanged)
+      ? 'Sélectionnez une chambre.'
+      : null;
+  const slotError = isActivity && !activitySlot ? 'Sélectionnez un créneau.' : null;
+  const formValid = !guestsError && !timeError && !datesError && !roomError && !slotError;
 
   const handleSubmit = async () => {
     if (!formValid) return;
 
     const payload: Partial<CreateReservationData> = {};
-    if (slotChanged) {
+    if (isHotelType) {
+      // Hôtel : arrivée + départ (le serveur recalcule le prix) ; pas d'horaires.
+      if (slotChanged || roomChanged) {
+        payload.date = formatDateISO(dateObj);
+        payload.dateEnd = formatDateISO(checkOutObj);
+        if (isHotel && roomTypeId) payload.roomTypeId = roomTypeId;
+      }
+    } else if (slotChanged) {
       // Les deux horaires sont toujours envoyés ensemble (le serveur contrôle leur ordre).
       payload.date = formatDateISO(dateObj);
       payload.timeStart = formatTime(timeStartObj);
@@ -133,7 +195,6 @@ export default function ReservationEditModal({
     }
     if (isEdit) {
       if (guestsInt !== reservation.guests) payload.guests = guestsInt;
-      if (isHotel && roomType !== (reservation.room_type ?? '')) payload.roomType = roomType;
       if (isActivity && activitySlot !== (reservation.activity_slot ?? '')) {
         payload.activitySlot = activitySlot;
       }
@@ -163,7 +224,17 @@ export default function ReservationEditModal({
 
   const onDateChange = (_event: DateTimePickerEvent, selected?: Date) => {
     setShowDate(Platform.OS === 'ios');
-    if (selected) setDateObj(selected);
+    if (selected) {
+      setDateObj(selected);
+      // Hôtel : le départ reste toujours après l'arrivée.
+      if (isHotelType && countNights(selected, checkOutObj) < 1) {
+        setCheckOutObj(addDays(selected, 1));
+      }
+    }
+  };
+  const onCheckOutChange = (_event: DateTimePickerEvent, selected?: Date) => {
+    setShowCheckOut(Platform.OS === 'ios');
+    if (selected) setCheckOutObj(selected);
   };
   const onStartChange = (_event: DateTimePickerEvent, selected?: Date) => {
     setShowStart(Platform.OS === 'ios');
@@ -199,12 +270,16 @@ export default function ReservationEditModal({
                 : 'Le créneau choisi n’est pas disponible. Proposez-en un autre : la réservation repassera « En attente ».'}
             </Text>
 
-            <Text style={styles.label}>{isEdit ? 'Date' : 'Nouvelle date'}</Text>
+            <Text style={styles.label}>
+              {isHotelType
+                ? isEdit ? 'Arrivée' : 'Nouvelle arrivée'
+                : isEdit ? 'Date' : 'Nouvelle date'}
+            </Text>
             <TouchableOpacity
               style={styles.input}
               onPress={() => setShowDate(true)}
               accessibilityRole="button"
-              accessibilityLabel="Choisir la date"
+              accessibilityLabel={isHotelType ? 'Choisir la date d\'arrivée' : 'Choisir la date'}
             >
               <View style={styles.inputRow}>
                 <FontIcon name="calendar" width={16} height={16} fill="#6b7280" />
@@ -221,6 +296,35 @@ export default function ReservationEditModal({
               />
             )}
 
+            {isHotelType && (
+              <>
+                <Text style={styles.label}>{isEdit ? 'Départ' : 'Nouveau départ'}</Text>
+                <TouchableOpacity
+                  style={styles.input}
+                  onPress={() => setShowCheckOut(true)}
+                  accessibilityRole="button"
+                  accessibilityLabel="Choisir la date de départ"
+                >
+                  <View style={styles.inputRow}>
+                    <FontIcon name="calendar" width={16} height={16} fill="#6b7280" />
+                    <Text style={styles.inputText}>{formatDateDisplay(checkOutObj)}</Text>
+                  </View>
+                </TouchableOpacity>
+                {showCheckOut && (
+                  <DateTimePicker
+                    value={checkOutObj}
+                    mode="date"
+                    display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                    onChange={onCheckOutChange}
+                    minimumDate={addDays(dateObj, 1)}
+                  />
+                )}
+                {nights > 0 ? <Text style={styles.nights}>{formatNights(nights)}</Text> : null}
+                {datesError ? <Text style={styles.error}>{datesError}</Text> : null}
+              </>
+            )}
+
+            {!isHotelType && (
             <View style={styles.row}>
               <View style={styles.half}>
                 <Text style={styles.label}>Heure début</Text>
@@ -269,11 +373,14 @@ export default function ReservationEditModal({
                 )}
               </View>
             </View>
+            )}
             {timeError ? <Text style={styles.error}>{timeError}</Text> : null}
 
             {isEdit && (
               <>
-                <Text style={styles.label}>Nombre de convives / participants</Text>
+                <Text style={styles.label}>
+                  {isHotelType ? 'Nombre de voyageurs' : 'Nombre de convives / participants'}
+                </Text>
                 <TextInput
                   style={styles.input}
                   value={guests}
@@ -287,21 +394,16 @@ export default function ReservationEditModal({
 
             {isHotel && (
               <>
-                <Text style={styles.label}>Type de chambre</Text>
-                <View style={styles.chips}>
-                  {ROOM_TYPES.map((rt) => (
-                    <TouchableOpacity
-                      key={rt}
-                      style={[styles.chip, roomType === rt && styles.chipActive]}
-                      onPress={() => setRoomType(rt)}
-                      accessibilityRole="button"
-                      accessibilityLabel={`Chambre : ${rt}`}
-                      accessibilityState={{ selected: roomType === rt }}
-                    >
-                      <Text style={[styles.chipText, roomType === rt && styles.chipTextActive]}>{rt}</Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
+                <Text style={styles.label}>Chambre</Text>
+                <RoomPicker
+                  rooms={rooms}
+                  loading={roomsLoading}
+                  error={roomsError}
+                  selectedId={roomTypeId}
+                  onSelect={setRoomTypeId}
+                  nights={nights}
+                  onRetry={loadRooms}
+                />
                 {roomError ? <Text style={styles.error}>{roomError}</Text> : null}
               </>
             )}
@@ -420,6 +522,7 @@ const styles = StyleSheet.create({
   chipText: { fontSize: 13, color: colors.textStrong, fontWeight: '500' },
   chipTextActive: { color: colors.surface },
   error: { color: colors.danger, fontSize: 13, marginTop: 6 },
+  nights: { color: colors.primaryDark, fontSize: 13, fontWeight: '600', marginTop: 6 },
   actions: { flexDirection: 'row', gap: 10, marginTop: 12 },
   cancelBtn: {
     flex: 1,

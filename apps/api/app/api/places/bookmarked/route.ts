@@ -31,6 +31,8 @@ export async function GET(request: Request) {
     const reviewStats = await getReviewStatsMap();
     const places = (data ?? []).map((place) => ({
       ...place,
+      // Le mobile attend phoneNumber (bouton « Appeler »)
+      phoneNumber: place.phone?.trim() ? place.phone : undefined,
       averageRating: reviewStats.get(String(place.id))?.averageRating ?? null,
       reviewCount: reviewStats.get(String(place.id))?.reviewCount ?? 0,
       bookmarked: true,

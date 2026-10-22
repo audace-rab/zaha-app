@@ -318,13 +318,13 @@ function PostPlacePicker({
         {choices.map((o) => (
           <option key={o.id} value={o.id}>
             {o.name}
-            {o.status === 'vip' ? ' (VIP)' : ''}
+            {o.status === 'vip' ? ' (VIP)' : o.status === 'premium' ? ' (Premium)' : ''}
           </option>
         ))}
       </select>
-      {place?.status === 'vip' && (
+      {(place?.status === 'vip' || place?.status === 'premium') && (
         <span className="rounded-full bg-amber-100 px-2 py-0.5 font-medium text-amber-700">
-          VIP · bouton réservation actif
+          {place.status === 'premium' ? 'Premium' : 'VIP'} · boutons réserver / appeler actifs
         </span>
       )}
     </div>

@@ -205,7 +205,7 @@ async function resolveCityIds(cityName?: string): Promise<string[]> {
 }
 
 function toPlaceStatus(value: unknown): PlaceStatus {
-  return value === 'vip' ? 'vip' : 'normal';
+  return value === 'vip' || value === 'premium' ? value : 'normal';
 }
 
 function mapRowToPlace(row: Record<string, unknown>): Place {
@@ -216,6 +216,7 @@ function mapRowToPlace(row: Record<string, unknown>): Place {
     name: String(row.name ?? 'Lieu sans nom'),
     category: row.category != null ? String(row.category) : undefined,
     address: row.address != null ? String(row.address) : undefined,
+    phoneNumber: row.phone != null && String(row.phone).trim() ? String(row.phone) : undefined,
     snippet: row.snippet != null ? String(row.snippet) : undefined,
     rating: row.rating != null ? Number(row.rating) : undefined,
     openingHours: row.opening_hours != null ? String(row.opening_hours) : undefined,
@@ -374,17 +375,18 @@ export interface PlaceMapPoint {
   photos?: string[];
   status: PlaceStatus;
   address?: string;
+  phoneNumber?: string;
 }
 
 export async function listAllPlaces(): Promise<PlaceMapPoint[]> {
-  const cacheKey = 'zaha_places_all_v3';
+  const cacheKey = 'zaha_places_all_v4';
   const cached = await cacheGet<PlaceMapPoint[]>(cacheKey);
   if (cached?.length) return cached;
 
   const supabase = createAdminClient();
   const { data, error } = await supabase
     .from('places')
-    .select('id, name, category, address, latitude, longitude, photo_url, photos, status')
+    .select('id, name, category, address, phone, latitude, longitude, photo_url, photos, status')
     .not('latitude', 'is', null)
     .not('longitude', 'is', null)
     .order('name');
@@ -404,6 +406,7 @@ export async function listAllPlaces(): Promise<PlaceMapPoint[]> {
     photos: Array.isArray(row.photos) ? (row.photos as unknown[]).map(String) : undefined,
     status: toPlaceStatus(row.status),
     address: row.address != null ? String(row.address) : undefined,
+    phoneNumber: row.phone != null && String(row.phone).trim() ? String(row.phone) : undefined,
   }));
 
   if (places.length > 0) {

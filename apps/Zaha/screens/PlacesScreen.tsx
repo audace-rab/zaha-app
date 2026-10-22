@@ -14,7 +14,7 @@ import {
   View,
 } from 'react-native';
 import Geolocation from '@react-native-community/geolocation';
-import { api } from '../lib/api';
+import { api, placeBadgeLabel, type PlaceStatus } from '../lib/api';
 import { readCache, writeCache } from '../lib/cache';
 import FontIcon, { type FontIconName } from '../components/FontIcon';
 import { colors, radius } from '../theme';
@@ -31,7 +31,7 @@ type Place = {
   googleMapsUri?: string;
   photoUrl?: string;
   openingHours?: string;
-  status?: 'normal' | 'vip';
+  status?: PlaceStatus;
   distance_km?: number;
   location?: { latitude: number; longitude: number };
 };
@@ -424,7 +424,9 @@ export default function PlacesScreen({ onSelectPlace }: PlacesScreenProps) {
             )}
             <View style={styles.cardBody}>
               <View style={styles.cardTitleRow}>
-                {item.status === 'vip' && <Text style={styles.vipBadge}>VIP</Text>}
+                {placeBadgeLabel(item.status) && (
+                  <Text style={styles.vipBadge}>{placeBadgeLabel(item.status)}</Text>
+                )}
                 <Text style={styles.name}>{item.name}</Text>
               </View>
               <View style={styles.addressRow}>

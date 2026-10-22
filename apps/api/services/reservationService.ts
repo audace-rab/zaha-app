@@ -4,15 +4,67 @@ import type { Database } from '@/lib/supabase/database.types';
 
 type Client = SupabaseClient<Database>;
 
+/** Erreur métier avec code HTTP, convertie en réponse par les routes. */
+export class ReservationError extends Error {
+  constructor(message: string, public readonly status: number = 400) {
+    super(message);
+    this.name = 'ReservationError';
+  }
+}
+
+const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+/** Nombre de nuits entre l'arrivée et le départ (YYYY-MM-DD), 0 si invalide. */
+export function countNights(start: string, end: string): number {
+  if (!DATE_RE.test(start) || !DATE_RE.test(end)) return 0;
+  const toUtc = (v: string) => {
+    const [y, m, d] = v.split('-').map(Number);
+    return Date.UTC(y, m - 1, d);
+  };
+  return Math.round((toUtc(end) - toUtc(start)) / 86_400_000);
+}
+
+interface RoomPricing {
+  id: string;
+  name: string;
+  capacity: number;
+  pricePerNight: number;
+  currency: string;
+}
+
+/**
+ * Charge une chambre active et vérifie qu'elle appartient bien au lieu.
+ * Le prix vient toujours de la base, jamais du client.
+ */
+async function loadRoom(supabase: Client, placeId: string, roomTypeId: string): Promise<RoomPricing> {
+  const { data } = await supabase
+    .from('place_room_types')
+    .select('id, name, capacity, price_per_night, currency, place_id, is_active')
+    .eq('id', roomTypeId)
+    .maybeSingle();
+  if (!data || data.place_id !== placeId || !data.is_active) {
+    throw new ReservationError('roomTypeId invalide pour ce lieu', 400);
+  }
+  return {
+    id: data.id,
+    name: data.name,
+    capacity: data.capacity,
+    pricePerNight: Number(data.price_per_night),
+    currency: data.currency,
+  };
+}
+
 export interface ReservationRow {
   id: string;
   user_id: string;
   place_id: string;
   reservation_type: string;
   date: string;
+  date_end: string | null;
   time_start: string | null;
   time_end: string | null;
   guests: number;
+  room_type_id: string | null;
   room_type: string | null;
   activity_slot: string | null;
   price: number;
@@ -31,11 +83,16 @@ export interface CreateReservationInput {
   userId: string;
   placeId: string;
   reservationType?: string;
+  /** Hôtel : date d'arrivée. Autres types : date de la réservation. */
   date: string;
+  /** Hôtel uniquement : date de départ. */
+  dateEnd?: string;
   timeStart?: string;
   timeEnd?: string;
   guests?: number;
   roomType?: string;
+  /** Hôtel uniquement : chambre choisie (obligatoire). */
+  roomTypeId?: string;
   activitySlot?: string;
   paymentMethod?: string;
   note?: string;
@@ -53,26 +110,69 @@ export async function createReservation(
 ): Promise<ReservationRow | null> {
   const { data: place } = await supabase
     .from('places')
-    .select('id')
+    .select('id, status')
     .eq('id', input.placeId)
     .maybeSingle();
   if (!place) return null;
+
+  // Seuls les lieux VIP / Premium sont réservables.
+  if (place.status !== 'vip' && place.status !== 'premium') {
+    throw new ReservationError('Ce lieu n\u2019accepte pas les réservations', 403);
+  }
+
+  const reservationType = input.reservationType ?? 'general';
+  const guests = input.guests ?? 1;
+
+  let dateEnd: string | null = null;
+  let timeStart: string | null = input.timeStart ?? null;
+  let timeEnd: string | null = input.timeEnd ?? null;
+  let roomTypeId: string | null = null;
+  let roomTypeName: string | null = input.roomType ?? null;
+  let price = 0;
+  let currency = 'MGA';
+
+  if (reservationType === 'hotel') {
+    // Hôtel : arrivée + départ (pas d'heures), chambre obligatoire, prix = nuits x tarif.
+    if (!input.dateEnd || !DATE_RE.test(input.dateEnd)) {
+      throw new ReservationError('dateEnd is required for a hotel reservation (YYYY-MM-DD)', 400);
+    }
+    const nights = countNights(input.date, input.dateEnd);
+    if (nights < 1) {
+      throw new ReservationError('dateEnd must be after date', 400);
+    }
+    if (!input.roomTypeId) {
+      throw new ReservationError('roomTypeId is required for a hotel reservation', 400);
+    }
+    const room = await loadRoom(supabase, input.placeId, input.roomTypeId);
+    if (guests > room.capacity) {
+      throw new ReservationError(`Cette chambre accueille ${room.capacity} personne(s) maximum`, 400);
+    }
+    dateEnd = input.dateEnd;
+    timeStart = null;
+    timeEnd = null;
+    roomTypeId = room.id;
+    roomTypeName = room.name;
+    price = nights * room.pricePerNight;
+    currency = room.currency;
+  }
 
   const { data, error } = await supabase
     .from('reservations')
     .insert({
       user_id: input.userId,
       place_id: input.placeId,
-      reservation_type: input.reservationType ?? 'general',
+      reservation_type: reservationType,
       date: input.date,
-      time_start: input.timeStart ?? null,
-      time_end: input.timeEnd ?? null,
-      guests: input.guests ?? 1,
-      room_type: input.roomType ?? null,
+      date_end: dateEnd,
+      time_start: timeStart,
+      time_end: timeEnd,
+      guests,
+      room_type_id: roomTypeId,
+      room_type: roomTypeName,
       activity_slot: input.activitySlot ?? null,
       // Prix et paiement déterminés côté serveur uniquement
-      price: 0,
-      currency: 'MGA',
+      price,
+      currency,
       status: 'pending',
       payment_method: input.paymentMethod ?? null,
       payment_status: 'unpaid',
@@ -168,8 +268,10 @@ export async function updateReservation(
     note: string;
     guests: number;
     roomType: string;
+    roomTypeId: string;
     activitySlot: string;
     date: string;
+    dateEnd: string;
     timeStart: string;
     timeEnd: string;
   }>
@@ -180,19 +282,72 @@ export async function updateReservation(
     note?: string;
     guests?: number;
     room_type?: string;
+    room_type_id?: string;
     activity_slot?: string;
     date?: string;
+    date_end?: string;
     time_start?: string;
     time_end?: string;
+    price?: number;
+    currency?: string;
     updated_at: string;
   } = {
     updated_at: new Date().toISOString(),
   };
+
+  // Hôtel : arrivée / départ / chambre / convives modifiés => on revalide
+  // l'ensemble et on recalcule le prix côté serveur.
+  const hotelFieldsTouched =
+    patch.date !== undefined ||
+    patch.dateEnd !== undefined ||
+    patch.roomTypeId !== undefined ||
+    patch.guests !== undefined;
+  if (hotelFieldsTouched) {
+    const { data: current } = await supabase
+      .from('reservations')
+      .select('reservation_type, place_id, date, date_end, room_type_id, guests')
+      .eq('id', reservationId)
+      .maybeSingle();
+
+    // Anciennes réservations d'hôtel (sans chambre ni départ) : pas de recalcul
+    // tant que le client ne fournit pas dateEnd / roomTypeId.
+    const isStructuredHotel =
+      current?.reservation_type === 'hotel' &&
+      (current.room_type_id !== null ||
+        patch.roomTypeId !== undefined ||
+        patch.dateEnd !== undefined);
+
+    if (current && isStructuredHotel) {
+      const start = patch.date ?? current.date;
+      const end = patch.dateEnd ?? current.date_end ?? '';
+      const nights = countNights(start, end);
+      if (nights < 1) {
+        throw new ReservationError('dateEnd must be after date', 400);
+      }
+      const roomId = patch.roomTypeId ?? current.room_type_id;
+      if (!roomId) {
+        throw new ReservationError('roomTypeId is required for a hotel reservation', 400);
+      }
+      const room = await loadRoom(supabase, current.place_id, roomId);
+      const guests = patch.guests ?? current.guests;
+      if (guests > room.capacity) {
+        throw new ReservationError(`Cette chambre accueille ${room.capacity} personne(s) maximum`, 400);
+      }
+      updateData.date_end = end;
+      updateData.room_type_id = room.id;
+      updateData.room_type = room.name;
+      updateData.price = nights * room.pricePerNight;
+      updateData.currency = room.currency;
+    }
+  }
   if (patch.status !== undefined) updateData.status = patch.status;
   if (patch.paymentMethod !== undefined) updateData.payment_method = patch.paymentMethod;
   if (patch.note !== undefined) updateData.note = patch.note;
   if (patch.guests !== undefined) updateData.guests = patch.guests;
-  if (patch.roomType !== undefined) updateData.room_type = patch.roomType;
+  // Hôtel : le nom de chambre vient de roomTypeId (déjà posé ci-dessus)
+  if (patch.roomType !== undefined && updateData.room_type === undefined) {
+    updateData.room_type = patch.roomType;
+  }
   if (patch.activitySlot !== undefined) updateData.activity_slot = patch.activitySlot;
   if (patch.date !== undefined) updateData.date = patch.date;
   if (patch.timeStart !== undefined) updateData.time_start = patch.timeStart;
@@ -254,6 +409,7 @@ export async function cancelReservation(
 export interface AvailabilitySlot {
   id: string;
   date: string;
+  date_end: string | null;
   time_start: string | null;
   time_end: string | null;
   guests: number;
@@ -269,7 +425,7 @@ export async function getAvailability(
 
   const { data, error } = await supabase
     .from('reservations')
-    .select('id, date, time_start, time_end, guests, status, reservation_type')
+    .select('id, date, date_end, time_start, time_end, guests, status, reservation_type')
     .eq('place_id', placeId)
     .eq('date', date)
     .neq('status', 'cancelled')

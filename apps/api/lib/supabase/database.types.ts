@@ -144,6 +144,7 @@ export interface Database {
           google_maps_uri: string | null;
           photo_url: string | null;
           photos: string[];
+          phone: string | null;
           status: string;
           city_id: string | null;
           created_at: string;
@@ -163,6 +164,7 @@ export interface Database {
           google_maps_uri?: string | null;
           photo_url?: string | null;
           photos?: string[];
+          phone?: string | null;
           status?: string;
           city_id?: string | null;
           created_at?: string;
@@ -182,6 +184,7 @@ export interface Database {
           google_maps_uri?: string | null;
           photo_url?: string | null;
           photos?: string[];
+          phone?: string | null;
           status?: string;
           city_id?: string | null;
           created_at?: string;
@@ -459,6 +462,53 @@ export interface Database {
           }
         ];
       };
+      place_room_types: {
+        Row: {
+          id: string;
+          place_id: string;
+          name: string;
+          description: string | null;
+          capacity: number;
+          price_per_night: number;
+          currency: string;
+          sort_order: number;
+          is_active: boolean;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          place_id: string;
+          name: string;
+          description?: string | null;
+          capacity?: number;
+          price_per_night?: number;
+          currency?: string;
+          sort_order?: number;
+          is_active?: boolean;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          place_id?: string;
+          name?: string;
+          description?: string | null;
+          capacity?: number;
+          price_per_night?: number;
+          currency?: string;
+          sort_order?: number;
+          is_active?: boolean;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'place_room_types_place_id_fkey';
+            columns: ['place_id'];
+            isOneToOne: false;
+            referencedRelation: 'places';
+            referencedColumns: ['id'];
+          }
+        ];
+      };
       reservations: {
         Row: {
           id: string;
@@ -466,9 +516,11 @@ export interface Database {
           place_id: string;
           reservation_type: string;
           date: string;
+          date_end: string | null;
           time_start: string | null;
           time_end: string | null;
           guests: number;
+          room_type_id: string | null;
           room_type: string | null;
           activity_slot: string | null;
           price: number;
@@ -486,9 +538,11 @@ export interface Database {
           place_id: string;
           reservation_type?: string;
           date: string;
+          date_end?: string | null;
           time_start?: string | null;
           time_end?: string | null;
           guests?: number;
+          room_type_id?: string | null;
           room_type?: string | null;
           activity_slot?: string | null;
           price?: number;
@@ -506,9 +560,11 @@ export interface Database {
           place_id?: string;
           reservation_type?: string;
           date?: string;
+          date_end?: string | null;
           time_start?: string | null;
           time_end?: string | null;
           guests?: number;
+          room_type_id?: string | null;
           room_type?: string | null;
           activity_slot?: string | null;
           price?: number;
@@ -533,6 +589,13 @@ export interface Database {
             columns: ['place_id'];
             isOneToOne: false;
             referencedRelation: 'places';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'reservations_room_type_id_fkey';
+            columns: ['room_type_id'];
+            isOneToOne: false;
+            referencedRelation: 'place_room_types';
             referencedColumns: ['id'];
           }
         ];

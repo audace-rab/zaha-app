@@ -12,8 +12,27 @@ export interface Coordinates {
   longitude: number;
 }
 
-/** Statut d'un lieu : VIP (badge + bouton réservation sur les posts) ou normal. */
-export type PlaceStatus = 'normal' | 'vip';
+/**
+ * Statut d'un lieu : VIP ou Premium (badge + boutons Réserver / Appeler),
+ * ou normal (aucun bouton). Premium se comporte exactement comme VIP.
+ */
+export type PlaceStatus = 'normal' | 'vip' | 'premium';
+
+/** Un lieu VIP ou Premium affiche les boutons Réserver et Appeler. */
+export function isReservableStatus(status?: PlaceStatus | string | null): boolean {
+  return status === 'vip' || status === 'premium';
+}
+
+/** Type de chambre d'un hôtel (prix par nuit géré au back-office). */
+export interface RoomType {
+  id: string;
+  placeId: string;
+  name: string;
+  description?: string;
+  capacity: number;
+  pricePerNight: number;
+  currency: string;
+}
 
 /**
  * Statut d'une réservation.
@@ -54,6 +73,7 @@ export interface FeedPlace {
   name: string;
   category?: string;
   address?: string;
+  phoneNumber?: string;
   status: PlaceStatus;
 }
 

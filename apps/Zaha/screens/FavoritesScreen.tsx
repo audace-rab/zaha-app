@@ -11,7 +11,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { api } from '../lib/api';
+import { api, type PlaceStatus } from '../lib/api';
 import FontIcon from '../components/FontIcon';
 import PlaceDetailScreen from './PlaceDetailScreen';
 import { colors, radius } from '../theme';
@@ -28,7 +28,7 @@ type FavoritePlace = {
   googleMapsUri?: string;
   photoUrl?: string;
   openingHours?: string;
-  status?: 'normal' | 'vip';
+  status?: PlaceStatus;
   location?: { latitude: number; longitude: number };
 };
 

@@ -4,10 +4,14 @@ import { useCallback, useEffect, useState } from 'react';
 
 interface ReservationRow {
   id: string;
+  /** Hôtel : date d'arrivée. */
   date: string;
+  /** Hôtel : date de départ. */
+  date_end: string | null;
   time_start: string | null;
   time_end: string | null;
   guests: number;
+  room_type: string | null;
   reservation_type: string;
   status: string;
   payment_status: string;
@@ -42,6 +46,18 @@ const STATUS_STYLES: Record<string, string> = {
 function toTimeInput(value: string | null): string {
   return value ? value.slice(0, 5) : '';
 }
+
+/** Nombre de nuits entre deux dates YYYY-MM-DD (0 si invalide). */
+function countNights(start: string, end: string | null): number {
+  if (!end) return 0;
+  const toUtc = (v: string) => {
+    const [y, m, d] = v.slice(0, 10).split('-').map(Number);
+    return Date.UTC(y, m - 1, d);
+  };
+  return Math.round((toUtc(end) - toUtc(start)) / 86_400_000);
+}
+
+const formatDate = (value: string) => new Date(value).toLocaleDateString('fr-FR');
 
 const PAYMENT_LABELS: Record<string, string> = {
   unpaid: 'Non payé',
@@ -107,6 +123,7 @@ export default function ReservationsPage() {
   const [slotDate, setSlotDate] = useState('');
   const [slotStart, setSlotStart] = useState('');
   const [slotEnd, setSlotEnd] = useState('');
+  const [slotDateEnd, setSlotDateEnd] = useState('');
   const [slotSaving, setSlotSaving] = useState(false);
   const [slotError, setSlotError] = useState<string | null>(null);
 
@@ -115,6 +132,7 @@ export default function ReservationsPage() {
     setSlotDate(r.date);
     setSlotStart(toTimeInput(r.time_start));
     setSlotEnd(toTimeInput(r.time_end));
+    setSlotDateEnd(r.date_end ?? '');
     setSlotError(null);
   }
 
@@ -126,14 +144,21 @@ export default function ReservationsPage() {
       setSlotError('Choisissez une date.');
       return;
     }
-    if (slotStart && slotEnd && slotEnd <= slotStart) {
+    const isHotel = rescheduling.reservation_type === 'hotel';
+    if (isHotel) {
+      if (!slotDateEnd || countNights(slotDate, slotDateEnd) < 1) {
+        setSlotError('Le départ doit être après l\u2019arrivée.');
+        return;
+      }
+    } else if (slotStart && slotEnd && slotEnd <= slotStart) {
       setSlotError("L'heure de fin doit être après l'heure de début.");
       return;
     }
-    const unchanged =
-      slotDate === rescheduling.date &&
-      slotStart === toTimeInput(rescheduling.time_start) &&
-      slotEnd === toTimeInput(rescheduling.time_end);
+    const unchanged = isHotel
+      ? slotDate === rescheduling.date && slotDateEnd === (rescheduling.date_end ?? '')
+      : slotDate === rescheduling.date &&
+        slotStart === toTimeInput(rescheduling.time_start) &&
+        slotEnd === toTimeInput(rescheduling.time_end);
     if (unchanged) {
       setSlotError('Proposez un créneau différent du créneau actuel.');
       return;
@@ -146,12 +171,16 @@ export default function ReservationsPage() {
       const res = await fetch(`/api/admin/reservations/${rescheduling.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          date: slotDate,
-          timeStart: slotStart || null,
-          timeEnd: slotEnd || null,
-          status: 'proposed',
-        }),
+        body: JSON.stringify(
+          isHotel
+            ? { date: slotDate, dateEnd: slotDateEnd, status: 'proposed' }
+            : {
+                date: slotDate,
+                timeStart: slotStart || null,
+                timeEnd: slotEnd || null,
+                status: 'proposed',
+              }
+        ),
       });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
@@ -159,16 +188,27 @@ export default function ReservationsPage() {
         return;
       }
       const id = rescheduling.id;
+      const { reservation: saved } = await res.json().catch(() => ({ reservation: null }));
       setReservations((rows) =>
         rows.map((r) =>
           r.id === id
-            ? {
-                ...r,
-                date: slotDate,
-                time_start: slotStart || null,
-                time_end: slotEnd || null,
-                status: 'proposed',
-              }
+            ? isHotel
+              ? {
+                  ...r,
+                  date: slotDate,
+                  date_end: slotDateEnd,
+                  time_start: null,
+                  time_end: null,
+                  price: saved?.price ?? r.price,
+                  status: 'proposed',
+                }
+              : {
+                  ...r,
+                  date: slotDate,
+                  time_start: slotStart || null,
+                  time_end: slotEnd || null,
+                  status: 'proposed',
+                }
             : r
         )
       );
@@ -279,7 +319,13 @@ export default function ReservationsPage() {
               reservations.map((r) => (
                 <tr key={r.id} className="hover:bg-slate-50">
                   <td className="px-4 py-3 text-slate-900">
-                    {new Date(r.date).toLocaleDateString('fr-FR')}
+                    {formatDate(r.date)}
+                    {r.reservation_type === 'hotel' && r.date_end && (
+                      <span className="block text-xs text-slate-500">
+                        → {formatDate(r.date_end)} · {countNights(r.date, r.date_end)} nuit
+                        {countNights(r.date, r.date_end) > 1 ? 's' : ''}
+                      </span>
+                    )}
                     {r.time_start && (
                       <span className="block text-xs text-slate-500">
                         {toTimeInput(r.time_start)}
@@ -296,7 +342,12 @@ export default function ReservationsPage() {
                       {r.guests} pers.
                     </span>
                   </td>
-                  <td className="px-4 py-3 text-slate-600">{r.reservation_type}</td>
+                  <td className="px-4 py-3 text-slate-600">
+                    {r.reservation_type}
+                    {r.room_type && (
+                      <span className="block text-xs text-slate-400">Chambre : {r.room_type}</span>
+                    )}
+                  </td>
                   <td className="px-4 py-3 text-slate-900">
                     {r.price.toLocaleString('fr-FR')} {r.currency}
                   </td>
@@ -372,8 +423,12 @@ export default function ReservationsPage() {
               </h2>
               <p className="mt-1 text-sm text-slate-500">
                 {rescheduling.placeName ?? 'Lieu'} · {rescheduling.userName ?? 'Client'} · créneau
-                indisponible du {new Date(rescheduling.date).toLocaleDateString('fr-FR')}
-                {rescheduling.time_start ? ` à ${toTimeInput(rescheduling.time_start)}` : ''}
+                indisponible du {formatDate(rescheduling.date)}
+                {rescheduling.reservation_type === 'hotel' && rescheduling.date_end
+                  ? ` au ${formatDate(rescheduling.date_end)}`
+                  : rescheduling.time_start
+                    ? ` à ${toTimeInput(rescheduling.time_start)}`
+                    : ''}
               </p>
             </div>
 
@@ -385,7 +440,7 @@ export default function ReservationsPage() {
 
             <div className="space-y-2">
               <label htmlFor="slot-date" className="block text-sm font-medium text-slate-700">
-                Nouvelle date
+                {rescheduling.reservation_type === 'hotel' ? 'Nouvelle arrivée' : 'Nouvelle date'}
               </label>
               <input
                 id="slot-date"
@@ -398,6 +453,22 @@ export default function ReservationsPage() {
               />
             </div>
 
+            {rescheduling.reservation_type === 'hotel' ? (
+              <div className="space-y-2">
+                <label htmlFor="slot-date-end" className="block text-sm font-medium text-slate-700">
+                  Nouveau départ
+                </label>
+                <input
+                  id="slot-date-end"
+                  type="date"
+                  required
+                  min={slotDate || new Date().toISOString().slice(0, 10)}
+                  value={slotDateEnd}
+                  onChange={(e) => setSlotDateEnd(e.target.value)}
+                  className={`${selectClass} w-full`}
+                />
+              </div>
+            ) : (
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-2">
                 <label htmlFor="slot-start" className="block text-sm font-medium text-slate-700">
@@ -424,6 +495,7 @@ export default function ReservationsPage() {
                 />
               </div>
             </div>
+            )}
 
             <p className="text-xs text-slate-500">
               Le client devra confirmer ce nouveau créneau depuis l’application. La réservation passe

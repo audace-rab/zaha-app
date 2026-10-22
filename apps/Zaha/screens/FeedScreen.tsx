@@ -6,6 +6,7 @@ import {
   FlatList,
   Image,
   Keyboard,
+  Linking,
   Modal,
   RefreshControl,
   ScrollView,
@@ -16,14 +17,21 @@ import {
   View,
 } from 'react-native';
 import { launchImageLibrary } from 'react-native-image-picker';
-import { api, type Comment, type FeedPlace, type MapPlace } from '../lib/api';
+import {
+  api,
+  isReservableStatus,
+  placeBadgeLabel,
+  type Comment,
+  type FeedPlace,
+  type MapPlace,
+} from '../lib/api';
 import { readCache, writeCache } from '../lib/cache';
 import { useAuthUser } from '../lib/useAuthUser';
 import FontIcon from '../components/FontIcon';
 import ReservationScreen from './ReservationScreen';
 import { colors, radius } from '../theme';
 
-const FEED_CACHE_KEY = 'cache:feed:v1';
+const FEED_CACHE_KEY = 'cache:feed:v2'; // v2 : lieux avec téléphone + statut premium
 const SCREEN_WIDTH = Dimensions.get('window').width;
 const CARD_WIDTH = SCREEN_WIDTH - 32;
 
@@ -414,7 +422,9 @@ export default function FeedScreen({ query, onClearSearch }: FeedScreenProps) {
               >
                 {postPlace ? postPlace.name : 'Lier un lieu (optionnel)'}
               </Text>
-              {postPlace?.status === 'vip' ? <Text style={styles.vipBadge}>VIP</Text> : null}
+              {placeBadgeLabel(postPlace?.status) ? (
+                <Text style={styles.vipBadge}>{placeBadgeLabel(postPlace?.status)}</Text>
+              ) : null}
               {postPlace ? (
                 <TouchableOpacity
                   onPress={() => setPostPlace(null)}
@@ -459,7 +469,9 @@ export default function FeedScreen({ query, onClearSearch }: FeedScreenProps) {
                           accessibilityLabel={`Choisir ${p.name}`}
                         >
                           <Text style={styles.placeRowName} numberOfLines={1}>{p.name}</Text>
-                          {p.status === 'vip' ? <Text style={styles.vipBadge}>VIP</Text> : null}
+                          {placeBadgeLabel(p.status) ? (
+                            <Text style={styles.vipBadge}>{placeBadgeLabel(p.status)}</Text>
+                          ) : null}
                         </TouchableOpacity>
                       ))
                     )}
@@ -649,8 +661,17 @@ function PostCard({
   const visibleComments = showAllComments ? comments : comments.slice(0, 3);
   const hiddenCount = comments.length - visibleComments.length;
 
-  // Lieu VIP rattaché : badge + bouton de réservation
-  const vipPlace = item.place?.status === 'vip' ? item.place : null;
+  // Lieu VIP / Premium rattaché : badge + boutons Réserver / Appeler
+  const vipPlace = item.place && isReservableStatus(item.place.status) ? item.place : null;
+
+  const callPlace = async (place: FeedPlace) => {
+    if (!place.phoneNumber) return;
+    try {
+      await Linking.openURL(`tel:${place.phoneNumber.replace(/[^+\d]/g, '')}`);
+    } catch {
+      Alert.alert('Impossible', 'Aucune application ne peut passer cet appel.');
+    }
+  };
   const locationLabel = item.place
     ? [item.place.name, item.location].filter(Boolean).join(' · ')
     : item.location;
@@ -668,7 +689,7 @@ function PostCard({
             <Text style={[styles.location, styles.locationText]} numberOfLines={1}>
               {locationLabel}
             </Text>
-            {vipPlace ? <Text style={styles.vipBadge}>VIP</Text> : null}
+            {vipPlace ? <Text style={styles.vipBadge}>{placeBadgeLabel(vipPlace.status)}</Text> : null}
           </View>
           {item.timestamp ? <Text style={styles.timestamp}>{formatRelativeTime(item.timestamp)}</Text> : null}
         </View>
@@ -733,15 +754,31 @@ function PostCard({
           <Text style={styles.commentCount}>{commentCount}</Text>
         </TouchableOpacity>
         {vipPlace ? (
-          <TouchableOpacity
-            style={styles.reserveButton}
-            onPress={() => onReserve(vipPlace)}
-            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-            accessibilityRole="button"
-            accessibilityLabel={`Réserver chez ${vipPlace.name}`}
-          >
-            <FontIcon name="calendar" width={24} height={24} fill={colors.vip} />
-          </TouchableOpacity>
+          // Lieu VIP / Premium : Réserver, puis Appeler juste en dessous
+          <View style={styles.reserveGroup}>
+            <TouchableOpacity
+              style={styles.reserveButton}
+              onPress={() => onReserve(vipPlace)}
+              hitSlop={{ top: 6, bottom: 6, left: 8, right: 8 }}
+              accessibilityRole="button"
+              accessibilityLabel={`Réserver chez ${vipPlace.name}`}
+            >
+              <FontIcon name="calendar" width={20} height={20} fill={colors.vip} />
+              <Text style={styles.reserveLabel}>Réserver</Text>
+            </TouchableOpacity>
+            {vipPlace.phoneNumber ? (
+              <TouchableOpacity
+                style={styles.reserveButton}
+                onPress={() => callPlace(vipPlace)}
+                hitSlop={{ top: 6, bottom: 6, left: 8, right: 8 }}
+                accessibilityRole="button"
+                accessibilityLabel={`Appeler ${vipPlace.name}`}
+              >
+                <FontIcon name="phone" width={20} height={20} fill={colors.vip} />
+                <Text style={styles.reserveLabel}>Appeler</Text>
+              </TouchableOpacity>
+            ) : null}
+          </View>
         ) : null}
       </View>
 
@@ -911,7 +948,9 @@ const styles = StyleSheet.create({
   likeCountActive: { color: colors.like },
   commentButton: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   commentCount: { color: colors.textSecondary, fontSize: 14, fontWeight: '600' },
+  reserveGroup: { marginLeft: 'auto', alignItems: 'flex-start', gap: 8 },
   reserveButton: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  reserveLabel: { color: colors.vip, fontSize: 13, fontWeight: '700' },
   locationRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   locationText: { flexShrink: 1 },
   vipBadge: {
