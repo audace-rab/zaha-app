@@ -19,7 +19,7 @@ import { api, isReservableStatus, placeBadgeLabel, type PlaceStatus } from '../l
 import { useAuthUser } from '../lib/useAuthUser';
 import ReservationScreen from './ReservationScreen';
 import FontIcon from '../components/FontIcon';
-import { colors, radius } from '../theme';
+import { colors, placeBadgeColors, radius } from '../theme';
 
 type Place = {
   id: string;
@@ -188,6 +188,7 @@ export default function PlaceDetailScreen({ place }: PlaceDetailScreenProps) {
 
   const openPhone = async () => {
     if (!place.phoneNumber) return;
+    api.trackPlaceClick(place.id, 'call', 'detail');
     const tel = `tel:${place.phoneNumber.replace(/[^+\d]/g, '')}`;
     try {
       await Linking.openURL(tel);
@@ -323,7 +324,9 @@ export default function PlaceDetailScreen({ place }: PlaceDetailScreenProps) {
 
         <View style={styles.titleRow}>
           {placeBadgeLabel(place.status) && (
-            <Text style={styles.vipBadge}>{placeBadgeLabel(place.status)}</Text>
+            <Text style={[styles.vipBadge, placeBadgeColors(place.status)]}>
+              {placeBadgeLabel(place.status)}
+            </Text>
           )}
           <Text style={styles.name}>{place.name}</Text>
         </View>
@@ -394,7 +397,10 @@ export default function PlaceDetailScreen({ place }: PlaceDetailScreenProps) {
           <>
             <TouchableOpacity
               style={styles.reserveButton}
-              onPress={() => setShowReservation(true)}
+              onPress={() => {
+                api.trackPlaceClick(place.id, 'reserve', 'detail');
+                setShowReservation(true);
+              }}
               accessibilityRole="button"
               accessibilityLabel="Réserver ce lieu"
             >

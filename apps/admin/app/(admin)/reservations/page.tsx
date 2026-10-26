@@ -222,11 +222,11 @@ export default function ReservationsPage() {
 
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
   const selectClass =
-    'rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-500';
+    'rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20';
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-semibold text-slate-900">Réservations</h1>
+      <h1 className="text-2xl font-bold text-slate-900">Réservations</h1>
 
       <div className="flex flex-wrap gap-3">
         <select
@@ -289,36 +289,36 @@ export default function ReservationsPage() {
         </div>
       )}
 
-      <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+      <div className="overflow-hidden rounded-xl border border-slate-100 bg-white shadow-sm">
         <table className="w-full text-left text-sm">
-          <thead className="border-b border-slate-200 bg-slate-50 text-xs uppercase text-slate-500">
+          <thead className="border-b border-slate-100 bg-slate-50 text-xs font-semibold uppercase tracking-wider text-slate-500">
             <tr>
-              <th className="px-4 py-3">Date</th>
-              <th className="px-4 py-3">Lieu</th>
-              <th className="px-4 py-3">Client</th>
-              <th className="px-4 py-3">Type</th>
-              <th className="px-4 py-3">Prix</th>
-              <th className="px-4 py-3">Paiement</th>
-              <th className="px-4 py-3">Statut</th>
+              <th className="px-6 py-4">Date</th>
+              <th className="px-6 py-4">Lieu</th>
+              <th className="px-6 py-4">Client</th>
+              <th className="px-6 py-4">Type</th>
+              <th className="px-6 py-4">Prix</th>
+              <th className="px-6 py-4">Paiement</th>
+              <th className="px-6 py-4">Statut</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
             {loading ? (
               <tr>
-                <td colSpan={7} className="px-4 py-8 text-center text-slate-500">
+                <td colSpan={7} className="px-6 py-8 text-center text-slate-500">
                   Chargement…
                 </td>
               </tr>
             ) : reservations.length === 0 ? (
               <tr>
-                <td colSpan={7} className="px-4 py-8 text-center text-slate-500">
+                <td colSpan={7} className="px-6 py-8 text-center text-slate-500">
                   Aucune réservation trouvée.
                 </td>
               </tr>
             ) : (
               reservations.map((r) => (
                 <tr key={r.id} className="hover:bg-slate-50">
-                  <td className="px-4 py-3 text-slate-900">
+                  <td className="px-6 py-4 text-slate-900">
                     {formatDate(r.date)}
                     {r.reservation_type === 'hotel' && r.date_end && (
                       <span className="block text-xs text-slate-500">
@@ -333,28 +333,28 @@ export default function ReservationsPage() {
                       </span>
                     )}
                   </td>
-                  <td className="px-4 py-3 font-medium text-slate-900">
+                  <td className="px-6 py-4 font-medium text-slate-900">
                     {r.placeName ?? '—'}
                   </td>
-                  <td className="px-4 py-3 text-slate-600">
+                  <td className="px-6 py-4 text-slate-600">
                     {r.userName ?? '—'}
                     <span className="block text-xs text-slate-400">
                       {r.guests} pers.
                     </span>
                   </td>
-                  <td className="px-4 py-3 text-slate-600">
+                  <td className="px-6 py-4 text-slate-600">
                     {r.reservation_type}
                     {r.room_type && (
                       <span className="block text-xs text-slate-400">Chambre : {r.room_type}</span>
                     )}
                   </td>
-                  <td className="px-4 py-3 text-slate-900">
+                  <td className="px-6 py-4 text-slate-900">
                     {r.price.toLocaleString('fr-FR')} {r.currency}
                   </td>
-                  <td className="px-4 py-3 text-slate-600">
+                  <td className="px-6 py-4 text-slate-600">
                     {PAYMENT_LABELS[r.payment_status] ?? r.payment_status}
                   </td>
-                  <td className="px-4 py-3">
+                  <td className="px-6 py-4">
                     <select
                       value={r.status}
                       onChange={(e) => updateStatus(r.id, e.target.value)}
@@ -514,7 +514,7 @@ export default function ReservationsPage() {
               <button
                 type="submit"
                 disabled={slotSaving}
-                className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-slate-700 disabled:opacity-50"
+                className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white shadow-md shadow-indigo-600/20 transition hover:bg-indigo-700 disabled:opacity-50"
               >
                 {slotSaving ? 'Enregistrement…' : 'Proposer ce créneau'}
               </button>

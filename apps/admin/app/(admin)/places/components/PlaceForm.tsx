@@ -248,7 +248,7 @@ export default function PlaceForm({ initialPlace = null }: PlaceFormProps) {
   }
 
   const inputClass =
-    'w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-500 focus:ring-2 focus:ring-slate-200';
+    'w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20';
   const labelClass = 'block text-sm font-medium text-slate-700';
 
   return (
@@ -259,7 +259,7 @@ export default function PlaceForm({ initialPlace = null }: PlaceFormProps) {
         </div>
       )}
 
-      <div className="grid gap-4 rounded-xl border border-slate-200 bg-white p-6 shadow-sm sm:grid-cols-2">
+      <div className="grid gap-4 rounded-xl border border-slate-100 bg-white p-6 shadow-sm sm:grid-cols-2">
         <div className="space-y-2">
           <label className={labelClass} htmlFor="name">Nom *</label>
           <input id="name" required value={form.name} onChange={(e) => set('name', e.target.value)} className={inputClass} />
@@ -583,7 +583,7 @@ export default function PlaceForm({ initialPlace = null }: PlaceFormProps) {
         <button
           type="submit"
           disabled={saving || uploading}
-          className="rounded-lg bg-slate-900 px-5 py-2 text-sm font-medium text-white transition hover:bg-slate-700 disabled:opacity-50"
+          className="rounded-lg bg-indigo-600 px-5 py-2 text-sm font-medium text-white shadow-md shadow-indigo-600/20 transition hover:bg-indigo-700 disabled:opacity-50"
         >
           {saving ? 'Enregistrement…' : isEdit ? 'Enregistrer' : 'Créer le lieu'}
         </button>

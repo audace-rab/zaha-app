@@ -29,11 +29,38 @@ export const colors = {
   vip: '#b45309',
   vipBg: '#fef3c7',
   vipBorder: '#fcd34d',
+  premium: '#1d4ed8',
+  premiumBg: '#dbeafe',
+  premiumBorder: '#93c5fd',
+  sponsored: '#a21caf',
+  sponsoredBg: '#fae8ff',
+  sponsoredBorder: '#f0abfc',
   unavailable: '#c2410c',
   unavailableBg: '#ffedd5',
   proposed: '#6d28d9',
   proposedBg: '#ede9fe',
 };
+
+/** Couleurs du badge d'un lieu : VIP = ambre, Premium = bleu. */
+export function placeBadgeColors(status?: string | null) {
+  if (status === 'premium') {
+    return {
+      backgroundColor: colors.premiumBg,
+      color: colors.premium,
+      borderColor: colors.premiumBorder,
+    };
+  }
+  return {
+    backgroundColor: colors.vipBg,
+    color: colors.vip,
+    borderColor: colors.vipBorder,
+  };
+}
+
+/** Couleur d'accent (icônes / libellés des boutons) selon le statut du lieu. */
+export function placeAccentColor(status?: string | null): string {
+  return status === 'premium' ? colors.premium : colors.vip;
+}
 
 export const radius = {
   sm: 8,

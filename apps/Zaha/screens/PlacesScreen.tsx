@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
@@ -14,10 +14,11 @@ import {
   View,
 } from 'react-native';
 import Geolocation from '@react-native-community/geolocation';
-import { api, placeBadgeLabel, type PlaceStatus } from '../lib/api';
+import { api, placeBadgeLabel, type AdBannerData, type PlaceStatus } from '../lib/api';
 import { readCache, writeCache } from '../lib/cache';
+import AdBanner from '../components/AdBanner';
 import FontIcon, { type FontIconName } from '../components/FontIcon';
-import { colors, radius } from '../theme';
+import { colors, placeBadgeColors, radius } from '../theme';
 
 type Place = {
   id: string;
@@ -53,6 +54,16 @@ function formatDistance(km: number) {
   return km < 1 ? `${Math.round(km * 1000)} m` : `${km.toFixed(1)} km`;
 }
 
+const STATUS_RANK: Record<PlaceStatus, number> = { vip: 0, premium: 1, normal: 2 };
+
+// Tri stable : VIP d'abord, puis Premium, puis les lieux normaux.
+// L'ordre d'arrivée (note, distance…) est conservé à statut égal.
+function sortByStatus(list: Place[]): Place[] {
+  return [...list].sort(
+    (a, b) => STATUS_RANK[a.status ?? 'normal'] - STATUS_RANK[b.status ?? 'normal']
+  );
+}
+
 type PlacesScreenProps = {
   onSelectPlace?: (place: Place) => void;
 };
@@ -76,6 +87,24 @@ export default function PlacesScreen({ onSelectPlace }: PlacesScreenProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [places, setPlaces] = useState<Place[]>([]);
   const [summary, setSummary] = useState('');
+  // Bannières publicitaires affichées juste avant les résultats.
+  const [banners, setBanners] = useState<AdBannerData[]>([]);
+  const sortedPlaces = useMemo(() => sortByStatus(places), [places]);
+
+  useEffect(() => {
+    let cancelled = false;
+    api
+      .fetchBanners()
+      .then(({ banners: list }) => {
+        if (!cancelled) setBanners(list);
+      })
+      .catch(() => {
+        // Pas de bannière si le chargement échoue : l'écran reste utilisable.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   // Formulaire de filtres replié par défaut ; déroulé si aucun résultat.
@@ -397,8 +426,9 @@ export default function PlacesScreen({ onSelectPlace }: PlacesScreenProps) {
       ) : null}
 
       <FlatList
-        data={places}
+        data={sortedPlaces}
         keyExtractor={(item) => item.id}
+        ListHeaderComponent={<AdBanner banners={banners} />}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
@@ -425,7 +455,9 @@ export default function PlacesScreen({ onSelectPlace }: PlacesScreenProps) {
             <View style={styles.cardBody}>
               <View style={styles.cardTitleRow}>
                 {placeBadgeLabel(item.status) && (
-                  <Text style={styles.vipBadge}>{placeBadgeLabel(item.status)}</Text>
+                  <Text style={[styles.vipBadge, placeBadgeColors(item.status)]}>
+                    {placeBadgeLabel(item.status)}
+                  </Text>
                 )}
                 <Text style={styles.name}>{item.name}</Text>
               </View>

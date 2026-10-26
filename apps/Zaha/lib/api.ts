@@ -36,6 +36,14 @@ export type RoomType = {
   currency: string;
 };
 
+/** Bannière publicitaire gérée depuis le back-office. */
+export type AdBannerData = {
+  id: string;
+  title: string;
+  imageUrl: string;
+  linkUrl?: string;
+};
+
 export type FeedPlace = {
   id: string;
   name: string;
@@ -57,6 +65,8 @@ type FeedItem = {
   commentsList: any[];
   commentsCount?: number;
   isBusiness: boolean;
+  /** Post sponsorisé : toujours en tête du feed. */
+  isSponsored?: boolean;
   location: string;
   place?: FeedPlace;
   timestamp: string;
@@ -492,6 +502,22 @@ export const api = {
       method: 'PUT',
       body: JSON.stringify(data),
     }),
+
+  // Bannières publicitaires actives (onglet Lieux).
+  fetchBanners: () => apiFetch<{ banners: AdBannerData[] }>('/api/banners'),
+
+  // Statistiques du dashboard : clic sur « Réserver » ou « Appeler ».
+  // Fire-and-forget : une erreur réseau ne doit jamais gêner l'utilisateur.
+  trackPlaceClick: (
+    placeId: string,
+    action: 'reserve' | 'call',
+    source: 'detail' | 'feed'
+  ): void => {
+    apiFetch<{ tracked: boolean }>(`/api/places/${placeId}/clicks`, {
+      method: 'POST',
+      body: JSON.stringify({ action, source }),
+    }).catch(() => {});
+  },
 
   // Types de chambre (et prix par nuit) d'un hôtel.
   fetchRooms: (placeId: string) =>

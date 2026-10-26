@@ -231,6 +231,18 @@ function mapRowToPlace(row: Record<string, unknown>): Place {
   };
 }
 
+const STATUS_RANK: Record<PlaceStatus, number> = { vip: 0, premium: 1, normal: 2 };
+
+/**
+ * Tri stable : d'abord les VIP, puis les Premium, puis les normaux.
+ * À l'intérieur d'un statut, l'ordre existant (proximité, note…) est conservé.
+ */
+export function sortByStatus<T extends { status?: PlaceStatus }>(places: T[]): T[] {
+  return [...places].sort(
+    (a, b) => STATUS_RANK[a.status ?? 'normal'] - STATUS_RANK[b.status ?? 'normal']
+  );
+}
+
 function sortByProximity(places: Place[], coords?: Coordinates | null): Place[] {
   if (!coords) return places;
   const distanceSq = (p: Place) => {
@@ -259,7 +271,10 @@ async function queryPlaces(params: {
     query = query.or(`category.eq."${safeCategory}",place_type.eq."${safeCategory}"`);
   }
 
+  // VIP d'abord, puis premium, puis normal (ordre alphabétique inverse de
+  // 'vip' > 'premium' > 'normal'), avant la limite pour ne pas couper les VIP.
   query = query
+    .order('status', { ascending: false })
     .order('rating', { ascending: false, nullsFirst: false })
     .limit(50);
 
@@ -448,14 +463,15 @@ export async function listNearbyPlaces(
   limit = 50
 ): Promise<PlaceNearbyPoint[]> {
   const places = await listAllPlaces();
-  return places
+  const nearby = places
     .map((place) => ({
       ...place,
       distance: haversineMeters(latitude, longitude, place.latitude, place.longitude),
     }))
     .filter((point) => point.distance <= radius)
-    .sort((a, b) => a.distance - b.distance)
-    .slice(0, limit);
+    .sort((a, b) => a.distance - b.distance);
+  // VIP, puis Premium, puis normaux (distance croissante à statut égal), puis limite.
+  return sortByStatus(nearby).slice(0, limit);
 }
 
 export async function countPlacesByCategory(): Promise<
@@ -507,7 +523,8 @@ export async function searchNearbyPlaces(
 
   if (dbResult.places.length > 0) {
     const result = {
-      places: sortByProximity(dbResult.places, coords),
+      // Proximité d'abord, puis tri stable par statut : VIP, Premium, normaux.
+      places: sortByStatus(sortByProximity(dbResult.places, coords)),
       summary: dbResult.summary,
     };
     await cacheSet(cacheKey, result, 2);

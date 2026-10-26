@@ -12,18 +12,12 @@ function sanitizeIlike(value: string): string {
   return value.replace(/[%_,()"']/g, ' ').trim();
 }
 
-export async function getFeed(filters?: FeedFilters): Promise<FeedPage> {
-  try {
-    const supabase = createAdminClient();
-    const viewerId = filters?.viewerId;
-
-    let dbQuery = supabase
-      .from('posts')
-      .select(`
+const POST_SELECT = `
         id,
         content,
         location,
         is_business,
+        is_sponsored,
         created_at,
         author:profiles!posts_author_id_fkey (
           id,
@@ -40,7 +34,29 @@ export async function getFeed(filters?: FeedFilters): Promise<FeedPage> {
           status
         ),
         post_media ( type, url, sort_order )
-      `)
+      `;
+
+export async function getFeed(filters?: FeedFilters): Promise<FeedPage> {
+  try {
+    const supabase = createAdminClient();
+    const viewerId = filters?.viewerId;
+
+    // Posts sponsorisés : épinglés en tête du feed de tous les utilisateurs,
+    // quels que soient la localisation ou le texte recherchés.
+    const sponsoredRes = await supabase
+      .from('posts')
+      .select(POST_SELECT)
+      .eq('is_sponsored', true)
+      .order('created_at', { ascending: false })
+      .order('id', { ascending: false });
+    if (sponsoredRes.error) {
+      console.error('Sponsored feed fetch error:', sponsoredRes.error);
+    }
+
+    let dbQuery = supabase
+      .from('posts')
+      .select(POST_SELECT)
+      .eq('is_sponsored', false)
       .order('created_at', { ascending: false })
       .order('id', { ascending: false });
 
@@ -57,14 +73,17 @@ export async function getFeed(filters?: FeedFilters): Promise<FeedPage> {
       }
     }
 
-    const { data: posts, error } = await dbQuery;
+    const { data: regularPosts, error } = await dbQuery;
 
     if (error) {
       console.error('Feed fetch error:', error);
       return { items: [], nextCursor: null };
     }
 
-    if (!posts?.length) return { items: [], nextCursor: null };
+    // Sponsorisés d'abord, puis les posts classiques.
+    const posts = [...(sponsoredRes.data ?? []), ...(regularPosts ?? [])];
+
+    if (!posts.length) return { items: [], nextCursor: null };
 
     const pageIds = posts.map((p) => p.id);
 
@@ -109,6 +128,7 @@ export async function getFeed(filters?: FeedFilters): Promise<FeedPage> {
         commentsList: [],
         commentsCount: commentsCount.get(post.id) ?? 0,
         isBusiness: post.is_business,
+        isSponsored: post.is_sponsored,
         location: post.location ?? '',
         place: place
           ? {

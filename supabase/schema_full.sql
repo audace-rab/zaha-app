@@ -112,6 +112,8 @@ create table if not exists public.posts (
   content text not null,
   location text default '',
   is_business boolean not null default false,
+  -- Post sponsorisé (créé depuis le back-office) : épinglé tout en haut du feed
+  is_sponsored boolean not null default false,
   -- Lieu rattaché (optionnel) : un lieu VIP ajoute badge + bouton réservation
   place_id uuid references public.places(id) on delete set null,
   created_at timestamptz not null default now()
@@ -224,6 +226,97 @@ create table if not exists public.reservations (
   updated_at timestamptz not null default now()
 );
 
+-- Bannières publicitaires affichées dans l'onglet Lieux, avant les résultats.
+-- Lecture publique des bannières actives ; écriture back-office (service_role).
+create table if not exists public.ad_banners (
+  id uuid primary key default uuid_generate_v4(),
+  title text not null,
+  image_url text not null,
+  link_url text,
+  is_active boolean not null default true,
+  created_at timestamptz not null default now()
+);
+
+create index if not exists ad_banners_active_idx
+  on public.ad_banners (is_active, created_at desc);
+
+alter table public.ad_banners enable row level security;
+
+drop policy if exists "Active banners are public" on public.ad_banners;
+create policy "Active banners are public"
+  on public.ad_banners for select using (is_active);
+
+-- Tracking des clics « Réserver » / « Appeler » (fiche du lieu et feed).
+-- RLS sans policy : seul le service_role (API / back-office) lit et écrit.
+create table if not exists public.place_click_events (
+  id uuid primary key default uuid_generate_v4(),
+  place_id uuid not null references public.places(id) on delete cascade,
+  user_id uuid references public.profiles(id) on delete set null,
+  action text not null check (action in ('reserve', 'call')),
+  source text not null default 'detail' check (source in ('detail', 'feed')),
+  created_at timestamptz not null default now()
+);
+
+create index if not exists place_click_events_place_idx
+  on public.place_click_events (place_id, action, created_at desc);
+create index if not exists place_click_events_created_idx
+  on public.place_click_events (created_at desc);
+
+alter table public.place_click_events enable row level security;
+
+-- Agrégat par lieu (total + 30 derniers jours) pour le dashboard.
+create or replace view public.place_click_stats as
+select
+  place_id,
+  count(*) filter (where action = 'reserve') as reserve_total,
+  count(*) filter (where action = 'call') as call_total,
+  count(*) filter (where action = 'reserve' and created_at >= now() - interval '30 days') as reserve_30d,
+  count(*) filter (where action = 'call' and created_at >= now() - interval '30 days') as call_30d,
+  max(created_at) as last_click_at
+from public.place_click_events
+group by place_id;
+
+revoke all on public.place_click_stats from anon, authenticated;
+grant select on public.place_click_stats to service_role;
+
+-- Série temporelle des clics pour le graphique du dashboard (heure de Madagascar).
+-- p_unit : 'hour' | 'day' ; p_count : nombre de tranches récentes (zéros inclus).
+create or replace function public.place_click_series(p_unit text, p_count int)
+returns table (bucket_start timestamp, reserve_count bigint, call_count bigint)
+language sql
+stable
+set search_path = public
+as $$
+  with params as (
+    select
+      case when p_unit = 'hour' then 'hour' else 'day' end as unit,
+      case when p_unit = 'hour' then interval '1 hour' else interval '1 day' end as step,
+      greatest(least(p_count, 366), 1) as n
+  ),
+  bounds as (
+    select unit, step, n,
+           date_trunc(unit, now() at time zone 'Indian/Antananarivo') as last_bucket
+    from params
+  ),
+  series as (
+    select generate_series(last_bucket - step * (n - 1), last_bucket, step) as b, unit, step, n
+    from bounds
+  )
+  select
+    s.b as bucket_start,
+    count(e.id) filter (where e.action = 'reserve') as reserve_count,
+    count(e.id) filter (where e.action = 'call') as call_count
+  from series s
+  left join public.place_click_events e
+    on e.created_at >= now() - (s.step * s.n) - interval '1 day'
+   and date_trunc(s.unit, e.created_at at time zone 'Indian/Antananarivo') = s.b
+  group by s.b
+  order by s.b;
+$$;
+
+revoke all on function public.place_click_series(text, int) from public, anon, authenticated;
+grant execute on function public.place_click_series(text, int) to service_role;
+
 -- ============================================================================
 -- 3. INDEX
 -- ============================================================================
@@ -240,6 +333,7 @@ create index if not exists places_city_idx on public.places (city_id);
 create index if not exists posts_author_idx on public.posts (author_id);
 create index if not exists posts_created_idx on public.posts (created_at desc);
 create index if not exists posts_place_idx on public.posts (place_id);
+create index if not exists posts_sponsored_idx on public.posts (created_at desc) where is_sponsored;
 create index if not exists post_media_post_idx on public.post_media (post_id);
 create index if not exists comments_post_idx on public.comments (post_id);
 
@@ -509,6 +603,16 @@ drop policy if exists "Public read place photos" on storage.objects;
 create policy "Public read place photos"
   on storage.objects for select
   using (bucket_id = 'place-photos');
+
+-- Bucket public pour les images de bannières publicitaires (écriture : service_role)
+insert into storage.buckets (id, name, public)
+values ('ad-banners', 'ad-banners', true)
+on conflict (id) do update set public = true;
+
+drop policy if exists "Public read ad banners" on storage.objects;
+create policy "Public read ad banners"
+  on storage.objects for select
+  using (bucket_id = 'ad-banners');
 
 -- Bucket public pour les photos de posts (upload avant création du post)
 insert into storage.buckets (id, name, public)

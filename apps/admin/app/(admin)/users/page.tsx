@@ -45,7 +45,7 @@ export default function UsersPage() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-semibold text-slate-900">Utilisateurs</h1>
+      <h1 className="text-2xl font-bold text-slate-900">Utilisateurs</h1>
 
       <input
         type="search"
@@ -55,7 +55,7 @@ export default function UsersPage() {
           setSearch(e.target.value);
           setPage(1);
         }}
-        className="w-72 rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-500"
+        className="w-72 rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20"
       />
 
       {error && (
@@ -64,35 +64,35 @@ export default function UsersPage() {
         </div>
       )}
 
-      <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+      <div className="overflow-hidden rounded-xl border border-slate-100 bg-white shadow-sm">
         <table className="w-full text-left text-sm">
-          <thead className="border-b border-slate-200 bg-slate-50 text-xs uppercase text-slate-500">
+          <thead className="border-b border-slate-100 bg-slate-50 text-xs font-semibold uppercase tracking-wider text-slate-500">
             <tr>
-              <th className="px-4 py-3">Nom</th>
-              <th className="px-4 py-3">Pays</th>
-              <th className="px-4 py-3">Langue</th>
-              <th className="px-4 py-3">Inscrit le</th>
-              <th className="px-4 py-3">Rôle</th>
-              <th className="px-4 py-3 text-right">Actions</th>
+              <th className="px-6 py-4">Nom</th>
+              <th className="px-6 py-4">Pays</th>
+              <th className="px-6 py-4">Langue</th>
+              <th className="px-6 py-4">Inscrit le</th>
+              <th className="px-6 py-4">Rôle</th>
+              <th className="px-6 py-4 text-right">Actions</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
             {loading ? (
               <tr>
-                <td colSpan={6} className="px-4 py-8 text-center text-slate-500">
+                <td colSpan={6} className="px-6 py-8 text-center text-slate-500">
                   Chargement…
                 </td>
               </tr>
             ) : users.length === 0 ? (
               <tr>
-                <td colSpan={6} className="px-4 py-8 text-center text-slate-500">
+                <td colSpan={6} className="px-6 py-8 text-center text-slate-500">
                   Aucun utilisateur trouvé.
                 </td>
               </tr>
             ) : (
               users.map((user) => (
                 <tr key={user.id} className="hover:bg-slate-50">
-                  <td className="px-4 py-3">
+                  <td className="px-6 py-4">
                     <div className="flex items-center gap-3">
                       {user.avatar_url ? (
                         // eslint-disable-next-line @next/next/no-img-element
@@ -109,14 +109,14 @@ export default function UsersPage() {
                       <span className="font-medium text-slate-900">{user.name}</span>
                     </div>
                   </td>
-                  <td className="px-4 py-3 text-slate-600">
+                  <td className="px-6 py-4 text-slate-600">
                     {user.country_flag} {user.country}
                   </td>
-                  <td className="px-4 py-3 text-slate-600">{user.language}</td>
-                  <td className="px-4 py-3 text-slate-600">
+                  <td className="px-6 py-4 text-slate-600">{user.language}</td>
+                  <td className="px-6 py-4 text-slate-600">
                     {new Date(user.created_at).toLocaleDateString('fr-FR')}
                   </td>
-                  <td className="px-4 py-3">
+                  <td className="px-6 py-4">
                     {user.is_admin ? (
                       <span className="rounded-full bg-indigo-100 px-2 py-0.5 text-xs font-medium text-indigo-700">
                         Admin
@@ -125,7 +125,7 @@ export default function UsersPage() {
                       <span className="text-slate-400">Utilisateur</span>
                     )}
                   </td>
-                  <td className="px-4 py-3 text-right">
+                  <td className="px-6 py-4 text-right">
                     <Link
                       href={`/users/${user.id}`}
                       className="text-sm font-medium text-slate-700 hover:underline"

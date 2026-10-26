@@ -29,7 +29,7 @@ import { readCache, writeCache } from '../lib/cache';
 import { useAuthUser } from '../lib/useAuthUser';
 import FontIcon from '../components/FontIcon';
 import ReservationScreen from './ReservationScreen';
-import { colors, radius } from '../theme';
+import { colors, placeAccentColor, placeBadgeColors, radius } from '../theme';
 
 const FEED_CACHE_KEY = 'cache:feed:v2'; // v2 : lieux avec téléphone + statut premium
 const SCREEN_WIDTH = Dimensions.get('window').width;
@@ -61,6 +61,8 @@ type FeedItem = {
   commentsList: any[];
   commentsCount?: number;
   isBusiness: boolean;
+  /** Post sponsorisé (créé depuis le back-office) : toujours en tête du feed. */
+  isSponsored?: boolean;
   location: string;
   place?: FeedPlace;
   timestamp: string;
@@ -423,7 +425,9 @@ export default function FeedScreen({ query, onClearSearch }: FeedScreenProps) {
                 {postPlace ? postPlace.name : 'Lier un lieu (optionnel)'}
               </Text>
               {placeBadgeLabel(postPlace?.status) ? (
-                <Text style={styles.vipBadge}>{placeBadgeLabel(postPlace?.status)}</Text>
+                <Text style={[styles.vipBadge, placeBadgeColors(postPlace?.status)]}>
+                  {placeBadgeLabel(postPlace?.status)}
+                </Text>
               ) : null}
               {postPlace ? (
                 <TouchableOpacity
@@ -470,7 +474,9 @@ export default function FeedScreen({ query, onClearSearch }: FeedScreenProps) {
                         >
                           <Text style={styles.placeRowName} numberOfLines={1}>{p.name}</Text>
                           {placeBadgeLabel(p.status) ? (
-                            <Text style={styles.vipBadge}>{placeBadgeLabel(p.status)}</Text>
+                            <Text style={[styles.vipBadge, placeBadgeColors(p.status)]}>
+                              {placeBadgeLabel(p.status)}
+                            </Text>
                           ) : null}
                         </TouchableOpacity>
                       ))
@@ -666,6 +672,7 @@ function PostCard({
 
   const callPlace = async (place: FeedPlace) => {
     if (!place.phoneNumber) return;
+    api.trackPlaceClick(place.id, 'call', 'feed');
     try {
       await Linking.openURL(`tel:${place.phoneNumber.replace(/[^+\d]/g, '')}`);
     } catch {
@@ -681,19 +688,26 @@ function PostCard({
       <View style={styles.header}>
         <Image source={{ uri: item.authorAvatar }} style={styles.avatar} />
         <View style={styles.headerText}>
-          <Text style={styles.author}>
-            {item.authorCountryFlag ? `${item.authorCountryFlag} ` : ''}
-            {item.author}
-          </Text>
+          <View style={styles.locationRow}>
+            <Text style={[styles.author, styles.locationText]} numberOfLines={1}>
+              {item.authorCountryFlag ? `${item.authorCountryFlag} ` : ''}
+              {item.author}
+            </Text>
+            {item.isSponsored ? <Text style={styles.sponsoredBadge}>Sponsorisé</Text> : null}
+          </View>
           <View style={styles.locationRow}>
             <Text style={[styles.location, styles.locationText]} numberOfLines={1}>
               {locationLabel}
             </Text>
-            {vipPlace ? <Text style={styles.vipBadge}>{placeBadgeLabel(vipPlace.status)}</Text> : null}
+            {vipPlace ? (
+              <Text style={[styles.vipBadge, placeBadgeColors(vipPlace.status)]}>
+                {placeBadgeLabel(vipPlace.status)}
+              </Text>
+            ) : null}
           </View>
           {item.timestamp ? <Text style={styles.timestamp}>{formatRelativeTime(item.timestamp)}</Text> : null}
         </View>
-        {item.authorId === currentUserId && (
+        {item.authorId === currentUserId && !item.isSponsored && (
           <TouchableOpacity
             style={styles.deleteBtn}
             onPress={() => onDeletePost(item)}
@@ -758,13 +772,18 @@ function PostCard({
           <View style={styles.reserveGroup}>
             <TouchableOpacity
               style={styles.reserveButton}
-              onPress={() => onReserve(vipPlace)}
+              onPress={() => {
+                api.trackPlaceClick(vipPlace.id, 'reserve', 'feed');
+                onReserve(vipPlace);
+              }}
               hitSlop={{ top: 6, bottom: 6, left: 8, right: 8 }}
               accessibilityRole="button"
               accessibilityLabel={`Réserver chez ${vipPlace.name}`}
             >
-              <FontIcon name="calendar" width={20} height={20} fill={colors.vip} />
-              <Text style={styles.reserveLabel}>Réserver</Text>
+              <FontIcon name="calendar" width={20} height={20} fill={placeAccentColor(vipPlace.status)} />
+              <Text style={[styles.reserveLabel, { color: placeAccentColor(vipPlace.status) }]}>
+                Réserver
+              </Text>
             </TouchableOpacity>
             {vipPlace.phoneNumber ? (
               <TouchableOpacity
@@ -774,8 +793,10 @@ function PostCard({
                 accessibilityRole="button"
                 accessibilityLabel={`Appeler ${vipPlace.name}`}
               >
-                <FontIcon name="phone" width={20} height={20} fill={colors.vip} />
-                <Text style={styles.reserveLabel}>Appeler</Text>
+                <FontIcon name="phone" width={20} height={20} fill={placeAccentColor(vipPlace.status)} />
+                <Text style={[styles.reserveLabel, { color: placeAccentColor(vipPlace.status) }]}>
+                  Appeler
+                </Text>
               </TouchableOpacity>
             ) : null}
           </View>
@@ -953,6 +974,18 @@ const styles = StyleSheet.create({
   reserveLabel: { color: colors.vip, fontSize: 13, fontWeight: '700' },
   locationRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   locationText: { flexShrink: 1 },
+  sponsoredBadge: {
+    backgroundColor: colors.sponsoredBg,
+    color: colors.sponsored,
+    borderWidth: 1,
+    borderColor: colors.sponsoredBorder,
+    fontSize: 10,
+    fontWeight: '800',
+    paddingHorizontal: 6,
+    paddingVertical: 1,
+    borderRadius: 4,
+    overflow: 'hidden',
+  },
   vipBadge: {
     backgroundColor: colors.vipBg,
     color: colors.vip,

@@ -26,6 +26,66 @@ export interface AdminStats {
     country: string;
     created_at: string;
   }>;
+  /** Clics « Réserver » / « Appeler » par lieu (total et 30 derniers jours). */
+  clicksByPlace: PlaceClickStats[];
+  clickTotals: { reserve: number; call: number; reserve30d: number; call30d: number };
+}
+
+export interface PlaceClickStats {
+  placeId: string;
+  placeName: string;
+  placeStatus: string;
+  reserveTotal: number;
+  callTotal: number;
+  reserve30d: number;
+  call30d: number;
+  lastClickAt: string | null;
+}
+
+/**
+ * Clics par lieu : tous les lieux VIP / Premium (y compris ceux à 0 clic, puisque
+ * ce sont les seuls à avoir les boutons) + tout lieu ayant déjà reçu des clics.
+ */
+async function getClickStats(supabase: SupabaseClient<Database>): Promise<PlaceClickStats[]> {
+  const [{ data: statRows }, { data: reservablePlaces }] = await Promise.all([
+    supabase.from('place_click_stats').select('*'),
+    supabase.from('places').select('id, name, status').in('status', ['vip', 'premium']),
+  ]);
+
+  const stats = new Map((statRows ?? []).map((r) => [r.place_id as string, r]));
+  const places = new Map<string, { name: string; status: string }>(
+    (reservablePlaces ?? []).map((p) => [p.id, { name: p.name, status: p.status }])
+  );
+
+  // Lieux ayant des clics mais n'étant plus VIP / Premium : on récupère leur nom.
+  const missingIds = [...stats.keys()].filter((id) => !places.has(id));
+  if (missingIds.length > 0) {
+    const { data: others } = await supabase
+      .from('places')
+      .select('id, name, status')
+      .in('id', missingIds);
+    for (const p of others ?? []) places.set(p.id, { name: p.name, status: p.status });
+  }
+
+  return [...places.entries()]
+    .map(([placeId, place]) => {
+      const row = stats.get(placeId);
+      return {
+        placeId,
+        placeName: place.name,
+        placeStatus: place.status,
+        reserveTotal: Number(row?.reserve_total ?? 0),
+        callTotal: Number(row?.call_total ?? 0),
+        reserve30d: Number(row?.reserve_30d ?? 0),
+        call30d: Number(row?.call_30d ?? 0),
+        lastClickAt: row?.last_click_at ?? null,
+      };
+    })
+    .sort(
+      (a, b) =>
+        b.reserveTotal + b.callTotal - (a.reserveTotal + a.callTotal) ||
+        a.placeName.localeCompare(b.placeName)
+    );
 }
 
 async function countRows(supabase: SupabaseClient<Database>, table: keyof Database['public']['Tables']): Promise<number> {
@@ -47,6 +107,7 @@ export async function getAdminStats(supabase: SupabaseClient<Database>): Promise
     { data: statusRows },
     { data: recentReservationsRaw },
     { data: recentUsersRaw },
+    clicksByPlace,
   ] = await Promise.all([
     countRows(supabase, 'profiles'),
     countRows(supabase, 'places'),
@@ -68,7 +129,18 @@ export async function getAdminStats(supabase: SupabaseClient<Database>): Promise
       .select('id, name, country, created_at')
       .order('created_at', { ascending: false })
       .limit(5),
+    getClickStats(supabase),
   ]);
+
+  const clickTotals = clicksByPlace.reduce(
+    (acc, p) => ({
+      reserve: acc.reserve + p.reserveTotal,
+      call: acc.call + p.callTotal,
+      reserve30d: acc.reserve30d + p.reserve30d,
+      call30d: acc.call30d + p.call30d,
+    }),
+    { reserve: 0, call: 0, reserve30d: 0, call30d: 0 }
+  );
 
   const reservationsByStatus: Record<string, number> = {};
   for (const row of statusRows ?? []) {
@@ -94,5 +166,7 @@ export async function getAdminStats(supabase: SupabaseClient<Database>): Promise
     reservationsByStatus,
     recentReservations,
     recentUsers: recentUsersRaw ?? [],
+    clicksByPlace,
+    clickTotals,
   };
 }

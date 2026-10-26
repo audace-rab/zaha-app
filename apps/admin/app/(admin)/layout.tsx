@@ -9,9 +9,11 @@ export default async function AdminLayout({ children }: LayoutProps<'/'>) {
   }
 
   return (
-    <div className="flex min-h-screen">
+    <div className="flex min-h-screen bg-slate-50">
       <Sidebar email={admin.email} />
-      <main className="flex-1 overflow-x-auto p-6 lg:p-8">{children}</main>
+      <main className="min-w-0 flex-1 overflow-x-auto px-6 py-8 md:px-8">
+        <div className="mx-auto max-w-7xl">{children}</div>
+      </main>
     </div>
   );
 }

@@ -25,7 +25,7 @@ export default async function EditPlacePage({
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-semibold text-slate-900">
+      <h1 className="text-2xl font-bold text-slate-900">
         Modifier « {place.name} »
       </h1>
       <PlaceForm initialPlace={place} />

@@ -221,6 +221,7 @@ export interface Database {
           content: string;
           location: string | null;
           is_business: boolean;
+          is_sponsored: boolean;
           place_id: string | null;
           created_at: string;
         };
@@ -230,6 +231,7 @@ export interface Database {
           content: string;
           location?: string | null;
           is_business?: boolean;
+          is_sponsored?: boolean;
           place_id?: string | null;
           created_at?: string;
         };
@@ -239,6 +241,7 @@ export interface Database {
           content?: string;
           location?: string | null;
           is_business?: boolean;
+          is_sponsored?: boolean;
           place_id?: string | null;
           created_at?: string;
         };
@@ -524,6 +527,68 @@ export interface Database {
           }
         ];
       };
+      place_click_events: {
+        Row: {
+          id: string;
+          place_id: string;
+          user_id: string | null;
+          action: string;
+          source: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          place_id: string;
+          user_id?: string | null;
+          action: string;
+          source?: string;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          place_id?: string;
+          user_id?: string | null;
+          action?: string;
+          source?: string;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'place_click_events_place_id_fkey';
+            columns: ['place_id'];
+            isOneToOne: false;
+            referencedRelation: 'places';
+            referencedColumns: ['id'];
+          }
+        ];
+      };
+      ad_banners: {
+        Row: {
+          id: string;
+          title: string;
+          image_url: string;
+          link_url: string | null;
+          is_active: boolean;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          title: string;
+          image_url: string;
+          link_url?: string | null;
+          is_active?: boolean;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          title?: string;
+          image_url?: string;
+          link_url?: string | null;
+          is_active?: boolean;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
       reservations: {
         Row: {
           id: string;
@@ -637,7 +702,28 @@ export interface Database {
         Relationships: [];
       };
     };
-    Views: Record<string, never>;
-    Functions: Record<string, never>;
+    Views: {
+      place_click_stats: {
+        Row: {
+          place_id: string | null;
+          reserve_total: number | null;
+          call_total: number | null;
+          reserve_30d: number | null;
+          call_30d: number | null;
+          last_click_at: string | null;
+        };
+        Relationships: [];
+      };
+    };
+    Functions: {
+      place_click_series: {
+        Args: { p_unit: string; p_count: number };
+        Returns: Array<{
+          bucket_start: string;
+          reserve_count: number;
+          call_count: number;
+        }>;
+      };
+    };
   };
 }

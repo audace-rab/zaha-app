@@ -65,10 +65,10 @@ export default function PlacesPage() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold text-slate-900">Lieux</h1>
+        <h1 className="text-2xl font-bold text-slate-900">Lieux</h1>
         <Link
           href="/places/new"
-          className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-slate-700"
+          className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white shadow-md shadow-indigo-600/20 transition hover:bg-indigo-700"
         >
           + Nouveau lieu
         </Link>
@@ -83,7 +83,7 @@ export default function PlacesPage() {
             setSearch(e.target.value);
             setPage(1);
           }}
-          className="w-72 rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-500"
+          className="w-72 rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20"
         />
         <select
           value={category}
@@ -91,7 +91,7 @@ export default function PlacesPage() {
             setCategory(e.target.value);
             setPage(1);
           }}
-          className="rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-500"
+          className="rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20"
         >
           <option value="">Toutes les catégories</option>
           {categories.map((c) => (
@@ -108,52 +108,58 @@ export default function PlacesPage() {
         </div>
       )}
 
-      <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+      <div className="overflow-hidden rounded-xl border border-slate-100 bg-white shadow-sm">
         <table className="w-full text-left text-sm">
-          <thead className="border-b border-slate-200 bg-slate-50 text-xs uppercase text-slate-500">
+          <thead className="border-b border-slate-100 bg-slate-50 text-xs font-semibold uppercase tracking-wider text-slate-500">
             <tr>
-              <th className="px-4 py-3">Nom</th>
-              <th className="px-4 py-3">Catégorie</th>
-              <th className="px-4 py-3">Adresse</th>
-              <th className="px-4 py-3">Note</th>
-              <th className="px-4 py-3">Statut</th>
-              <th className="px-4 py-3 text-right">Actions</th>
+              <th className="px-6 py-4">Nom</th>
+              <th className="px-6 py-4">Catégorie</th>
+              <th className="px-6 py-4">Adresse</th>
+              <th className="px-6 py-4">Note</th>
+              <th className="px-6 py-4">Statut</th>
+              <th className="px-6 py-4 text-right">Actions</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
             {loading ? (
               <tr>
-                <td colSpan={6} className="px-4 py-8 text-center text-slate-500">
+                <td colSpan={6} className="px-6 py-8 text-center text-slate-500">
                   Chargement…
                 </td>
               </tr>
             ) : places.length === 0 ? (
               <tr>
-                <td colSpan={6} className="px-4 py-8 text-center text-slate-500">
+                <td colSpan={6} className="px-6 py-8 text-center text-slate-500">
                   Aucun lieu trouvé.
                 </td>
               </tr>
             ) : (
               places.map((place) => (
                 <tr key={place.id} className="hover:bg-slate-50">
-                  <td className="px-4 py-3 font-medium text-slate-900">{place.name}</td>
-                  <td className="px-4 py-3 text-slate-600">{place.category}</td>
-                  <td className="max-w-56 truncate px-4 py-3 text-slate-600">
+                  <td className="px-6 py-4 font-medium text-slate-900">{place.name}</td>
+                  <td className="px-6 py-4 text-slate-600">{place.category}</td>
+                  <td className="max-w-56 truncate px-6 py-4 text-slate-600">
                     {place.address ?? '—'}
                   </td>
-                  <td className="px-4 py-3 text-slate-600">
+                  <td className="px-6 py-4 text-slate-600">
                     {place.rating != null ? place.rating.toFixed(1) : '—'}
                   </td>
-                  <td className="px-4 py-3">
+                  <td className="px-6 py-4">
                     {place.status === 'vip' || place.status === 'premium' ? (
-                      <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700">
+                      <span
+                        className={`rounded-full px-2 py-0.5 text-xs font-medium ${
+                          place.status === 'premium'
+                            ? 'bg-blue-100 text-blue-700'
+                            : 'bg-amber-100 text-amber-700'
+                        }`}
+                      >
                         {place.status === 'premium' ? 'Premium' : 'VIP'}
                       </span>
                     ) : (
                       <span className="text-slate-500">Normal</span>
                     )}
                   </td>
-                  <td className="px-4 py-3 text-right">
+                  <td className="px-6 py-4 text-right">
                     <Link
                       href={`/places/${place.id}`}
                       className="mr-3 text-sm font-medium text-slate-700 hover:underline"

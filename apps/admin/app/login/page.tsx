@@ -48,10 +48,15 @@ function LoginForm() {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="w-full max-w-sm space-y-4 rounded-xl border border-slate-200 bg-white p-8 shadow-sm">
-      <div className="space-y-1 text-center">
-        <h1 className="text-2xl font-semibold text-slate-900">Zaha Back-office</h1>
-        <p className="text-sm text-slate-500">Connexion administrateur</p>
+    <form onSubmit={handleSubmit} className="w-full max-w-sm space-y-4 rounded-xl border border-slate-100 bg-white p-8 shadow-sm">
+      <div className="space-y-2 text-center">
+        <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-xl bg-indigo-600 text-2xl font-bold text-white shadow-md shadow-indigo-600/30">
+          Z
+        </div>
+        <h1 className="text-2xl font-bold tracking-tight text-slate-900">
+          ZAHA<span className="text-indigo-500">.</span>
+        </h1>
+        <p className="text-sm text-slate-500">Connexion au back-office</p>
       </div>
 
       {error && (
@@ -71,7 +76,7 @@ function LoginForm() {
           autoComplete="email"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
-          className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-500 focus:ring-2 focus:ring-slate-200"
+          className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20"
         />
       </div>
 
@@ -86,14 +91,14 @@ function LoginForm() {
           autoComplete="current-password"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
-          className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-500 focus:ring-2 focus:ring-slate-200"
+          className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20"
         />
       </div>
 
       <button
         type="submit"
         disabled={loading}
-        className="w-full rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-slate-700 disabled:opacity-50"
+        className="w-full rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white shadow-md shadow-indigo-600/20 transition hover:bg-indigo-700 disabled:opacity-50"
       >
         {loading ? 'Connexion…' : 'Se connecter'}
       </button>

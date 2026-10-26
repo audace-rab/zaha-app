@@ -103,6 +103,8 @@ export interface FeedItem {
   commentsList: Comment[];
   commentsCount?: number;
   isBusiness: boolean;
+  /** Post sponsorisé (créé depuis le back-office) : toujours affiché en tête du feed. */
+  isSponsored?: boolean;
   location: string;
   /** Lieu rattaché au post (optionnel). Un lieu VIP affiche badge + bouton réservation. */
   place?: FeedPlace;

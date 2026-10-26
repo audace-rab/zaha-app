@@ -206,6 +206,7 @@ export interface Database {
           content: string;
           location: string | null;
           is_business: boolean;
+          is_sponsored: boolean;
           place_id: string | null;
           created_at: string;
         };
@@ -215,6 +216,7 @@ export interface Database {
           content: string;
           location?: string | null;
           is_business?: boolean;
+          is_sponsored?: boolean;
           place_id?: string | null;
           created_at?: string;
         };
@@ -224,6 +226,7 @@ export interface Database {
           content?: string;
           location?: string | null;
           is_business?: boolean;
+          is_sponsored?: boolean;
           place_id?: string | null;
           created_at?: string;
         };
@@ -508,6 +511,68 @@ export interface Database {
             referencedColumns: ['id'];
           }
         ];
+      };
+      place_click_events: {
+        Row: {
+          id: string;
+          place_id: string;
+          user_id: string | null;
+          action: string;
+          source: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          place_id: string;
+          user_id?: string | null;
+          action: string;
+          source?: string;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          place_id?: string;
+          user_id?: string | null;
+          action?: string;
+          source?: string;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'place_click_events_place_id_fkey';
+            columns: ['place_id'];
+            isOneToOne: false;
+            referencedRelation: 'places';
+            referencedColumns: ['id'];
+          }
+        ];
+      };
+      ad_banners: {
+        Row: {
+          id: string;
+          title: string;
+          image_url: string;
+          link_url: string | null;
+          is_active: boolean;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          title: string;
+          image_url: string;
+          link_url?: string | null;
+          is_active?: boolean;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          title?: string;
+          image_url?: string;
+          link_url?: string | null;
+          is_active?: boolean;
+          created_at?: string;
+        };
+        Relationships: [];
       };
       reservations: {
         Row: {
