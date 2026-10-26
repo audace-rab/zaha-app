@@ -705,7 +705,7 @@ function PostCard({
               </Text>
             ) : null}
           </View>
-          {item.timestamp ? <Text style={styles.timestamp}>{formatRelativeTime(item.timestamp)}</Text> : null}
+          {item.timestamp && !item.isSponsored ? <Text style={styles.timestamp}>{formatRelativeTime(item.timestamp)}</Text> : null}
         </View>
         {item.authorId === currentUserId && !item.isSponsored && (
           <TouchableOpacity

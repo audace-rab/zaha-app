@@ -73,7 +73,7 @@ export default function BannersPage() {
         <h1 className="text-2xl font-bold text-slate-900">Bannières publicitaires</h1>
         <p className="mt-1 text-sm text-slate-500">
           Les bannières actives sont affichées dans l’onglet Lieux de l’application, juste avant les
-          résultats de recherche. S’il y en a plusieurs, elles défilent horizontalement (la plus
+          résultats de recherche. S’il y en a plusieurs, elles défilent automatiquement toutes les 4 secondes (la plus
           récente en premier).
         </p>
       </div>
@@ -103,7 +103,7 @@ export default function BannersPage() {
               <img
                 src={banner.image_url}
                 alt={banner.title}
-                className={`h-24 w-72 shrink-0 rounded-lg object-cover ${
+                className={`aspect-[12/5] w-72 shrink-0 rounded-lg object-cover ${
                   banner.is_active ? '' : 'opacity-40'
                 }`}
               />
@@ -320,10 +320,10 @@ function NewBannerForm({ onCreated }: { onCreated: () => void }) {
         </div>
         {imageUrl && (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={imageUrl} alt="Aperçu" className="aspect-[3/1] w-full max-w-xl rounded-lg object-cover" />
+          <img src={imageUrl} alt="Aperçu" className="aspect-[12/5] w-full max-w-xl rounded-lg object-cover" />
         )}
         <p className="text-xs text-slate-500">
-          Format conseillé : 3:1 (par exemple 1200 × 400 px). JPEG, PNG, GIF ou WebP — 4 Mo max.
+          Format conseillé : 12:5 (par exemple 1200 × 500 px). JPEG, PNG, GIF ou WebP — 4 Mo max.
           L’image est recadrée au centre si le format diffère.
         </p>
       </div>
